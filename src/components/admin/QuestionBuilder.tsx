@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Question, QuestionType, Option, Passage } from '../../types/database';
+import { compressImageFile } from '../../utils/imageCompressor';
 import {
   HelpCircle,
   Image as ImageIcon,
@@ -11,6 +12,7 @@ import {
   Sparkles,
   BookOpen,
   FileText,
+  Loader2,
 } from 'lucide-react';
 
 interface QuestionBuilderProps {
@@ -64,6 +66,7 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
     question.question_type || 'MULTIPLE_CHOICE'
   );
   const [prompt, setPrompt] = useState(question.prompt || '');
+  const [isProcessingImages, setIsProcessingImages] = useState<boolean>(false);
   const [imageUrls, setImageUrls] = useState<string[]>(() => {
     return filterValidImages(question.image_urls || question.image_url);
   });
@@ -159,22 +162,31 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
     }
   };
 
-  const handleMultipleImagesUpload = (
+  const handleMultipleImagesUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
     setter: React.Dispatch<React.SetStateAction<string[]>>
   ) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    Array.from(files).forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setter((prev) => [...prev, event.target!.result as string]);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+    setIsProcessingImages(true);
+    try {
+      const fileList = Array.from(files);
+      const compressedUrls: string[] = [];
+
+      for (const file of fileList) {
+        const compressed = await compressImageFile(file);
+        compressedUrls.push(compressed);
+      }
+
+      setter((prev) => [...prev, ...compressedUrls]);
+    } catch (err) {
+      console.error('Error compressing image upload:', err);
+      alert('Failed to process image file. Please try a different image.');
+    } finally {
+      setIsProcessingImages(false);
+      if (e.target) e.target.value = '';
+    }
   };
 
   const handleAddOption = () => {
@@ -637,10 +649,22 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
         </button>
         <button
           type="button"
+          disabled={isProcessingImages}
           onClick={handleSave}
-          className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md hover:shadow-blue-500/20 transition-all"
+          className={`px-6 py-2.5 rounded-xl text-white text-xs font-bold shadow-md transition-all flex items-center space-x-2 ${
+            isProcessingImages
+              ? 'bg-slate-400 cursor-not-allowed'
+              : 'bg-blue-600 hover:bg-blue-500 hover:shadow-blue-500/20 active:scale-95'
+          }`}
         >
-          Save Question
+          {isProcessingImages ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Processing Images...</span>
+            </>
+          ) : (
+            <span>Save Question</span>
+          )}
         </button>
       </div>
     </div>
