@@ -63,19 +63,32 @@ export const AdminDashboard: React.FC = () => {
     loadTests();
   };
 
-  const handleStatusToggle = async (testId: string, currentStatus: TestStatus) => {
-    let nextStatus: TestStatus = 'ACTIVE';
-    if (currentStatus === 'DRAFT' || currentStatus === 'REVIEW') nextStatus = 'PUBLISHED';
-    else if (currentStatus === 'PUBLISHED') nextStatus = 'ACTIVE';
-    else if (currentStatus === 'ACTIVE') nextStatus = 'CLOSED';
-    else if (currentStatus === 'CLOSED') nextStatus = 'ACTIVE';
+  const handleCloseTest = async (testId: string) => {
+    setTests((prev) =>
+      prev.map((t) => (t.id === testId ? { ...t, status: 'CLOSED' as TestStatus } : t))
+    );
+    await dbService.updateTestStatus(testId, 'CLOSED');
+    loadTests();
+  };
 
-    await dbService.updateTestStatus(testId, nextStatus);
+  const handlePublishTest = async (testId: string) => {
+    setTests((prev) =>
+      prev.map((t) => (t.id === testId ? { ...t, status: 'PUBLISHED' as TestStatus } : t))
+    );
+    await dbService.updateTestStatus(testId, 'PUBLISHED');
+    loadTests();
+  };
+
+  const handleReactivateTest = async (testId: string) => {
+    setTests((prev) =>
+      prev.map((t) => (t.id === testId ? { ...t, status: 'PUBLISHED' as TestStatus } : t))
+    );
+    await dbService.updateTestStatus(testId, 'PUBLISHED');
     loadTests();
   };
 
   const handleDeleteTest = async (testId: string, title: string) => {
-    if (window.confirm(`Are you sure you want to permanently delete "${title}" and all its questions/attempts from the database?`)) {
+    if (window.confirm(`Are you sure you want to permanently delete "${title}" and all its data from the database?`)) {
       setTests((prev) => prev.filter((t) => t.id !== testId));
       await dbService.deleteTest(testId);
       loadTests();
@@ -279,11 +292,19 @@ export const AdminDashboard: React.FC = () => {
                       </Link>
 
                       <button
-                        onClick={() => handleStatusToggle(t.id, t.status)}
-                        className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-rose-600 hover:bg-rose-50 font-medium transition-colors"
-                        title="Close Test"
+                        onClick={() => handleCloseTest(t.id)}
+                        className="px-2.5 py-1.5 rounded-lg border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 font-bold transition-colors"
+                        title="Close / Archive Test"
                       >
                         Close
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteTest(t.id, t.title)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                        title="Permanently Delete Test"
+                      >
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
@@ -329,7 +350,7 @@ export const AdminDashboard: React.FC = () => {
                     </Link>
 
                     <button
-                      onClick={() => handleStatusToggle(t.id, t.status)}
+                      onClick={() => handlePublishTest(t.id)}
                       className="py-2 px-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 font-semibold text-xs transition-colors flex items-center space-x-1"
                       title="Publish Test to Make it Active"
                     >
@@ -391,7 +412,7 @@ export const AdminDashboard: React.FC = () => {
 
                     <div className="flex items-center space-x-2">
                       <button
-                        onClick={() => handleStatusToggle(t.id, t.status)}
+                        onClick={() => handleReactivateTest(t.id)}
                         className="px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 font-bold transition-colors flex items-center space-x-1"
                         title="Reactivate test back to active published state"
                       >
