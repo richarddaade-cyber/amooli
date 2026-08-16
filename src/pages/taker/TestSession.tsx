@@ -14,6 +14,7 @@ import {
   Menu,
   FileCheck,
 } from 'lucide-react';
+import { filterValidImages } from '../../components/admin/QuestionBuilder';
 
 export const TestSession: React.FC = () => {
   const { attemptId } = useParams<{ attemptId: string }>();
@@ -465,28 +466,28 @@ export const TestSession: React.FC = () => {
                       <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Quantity A</span>
                       <div className="p-4 rounded-xl bg-white border border-slate-300 text-base font-bold text-slate-900 shadow-sm space-y-3">
                         {currentQ.quantity_a && <div>{currentQ.quantity_a}</div>}
-                        {(currentQ.quantity_a_images?.length || currentQ.quantity_a_image) ? (
+                        {filterValidImages(currentQ.quantity_a_images || currentQ.quantity_a_image).length > 0 && (
                           <div className="grid grid-cols-1 gap-2 pt-1">
-                            {(currentQ.quantity_a_images && currentQ.quantity_a_images.length > 0 ? currentQ.quantity_a_images : [currentQ.quantity_a_image!]).map((url, idx) => (
-                              <img key={idx} src={url} alt={`Quantity A ${idx + 1}`} className="max-h-52 object-contain rounded-xl border border-slate-200 p-1.5 bg-white shadow-sm" />
+                            {filterValidImages(currentQ.quantity_a_images || currentQ.quantity_a_image).map((url, idx) => (
+                              <img key={idx} src={url} alt={`Quantity A Visual ${idx + 1}`} className="max-h-56 object-contain rounded-xl border border-slate-200 p-2 bg-white shadow-sm" />
                             ))}
                           </div>
-                        ) : null}
-                        {!currentQ.quantity_a && !currentQ.quantity_a_image && (!currentQ.quantity_a_images || currentQ.quantity_a_images.length === 0) && <div>—</div>}
+                        )}
+                        {!currentQ.quantity_a && filterValidImages(currentQ.quantity_a_images || currentQ.quantity_a_image).length === 0 && <div>—</div>}
                       </div>
                     </div>
                     <div className="space-y-2">
                       <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Quantity B</span>
                       <div className="p-4 rounded-xl bg-white border border-slate-300 text-base font-bold text-slate-900 shadow-sm space-y-3">
                         {currentQ.quantity_b && <div>{currentQ.quantity_b}</div>}
-                        {(currentQ.quantity_b_images?.length || currentQ.quantity_b_image) ? (
+                        {filterValidImages(currentQ.quantity_b_images || currentQ.quantity_b_image).length > 0 && (
                           <div className="grid grid-cols-1 gap-2 pt-1">
-                            {(currentQ.quantity_b_images && currentQ.quantity_b_images.length > 0 ? currentQ.quantity_b_images : [currentQ.quantity_b_image!]).map((url, idx) => (
-                              <img key={idx} src={url} alt={`Quantity B ${idx + 1}`} className="max-h-52 object-contain rounded-xl border border-slate-200 p-1.5 bg-white shadow-sm" />
+                            {filterValidImages(currentQ.quantity_b_images || currentQ.quantity_b_image).map((url, idx) => (
+                              <img key={idx} src={url} alt={`Quantity B Visual ${idx + 1}`} className="max-h-56 object-contain rounded-xl border border-slate-200 p-2 bg-white shadow-sm" />
                             ))}
                           </div>
-                        ) : null}
-                        {!currentQ.quantity_b && !currentQ.quantity_b_image && (!currentQ.quantity_b_images || currentQ.quantity_b_images.length === 0) && <div>—</div>}
+                        )}
+                        {!currentQ.quantity_b && filterValidImages(currentQ.quantity_b_images || currentQ.quantity_b_image).length === 0 && <div>—</div>}
                       </div>
                     </div>
                   </div>

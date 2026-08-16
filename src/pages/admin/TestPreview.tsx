@@ -4,6 +4,7 @@ import { AdminLayout } from '../../components/admin/AdminLayout';
 import { dbService } from '../../services/db';
 import { TestFullDetails, Question } from '../../types/database';
 import { ArrowLeft, Clock, Eye, AlertCircle, BookOpen } from 'lucide-react';
+import { filterValidImages } from '../../components/admin/QuestionBuilder';
 
 export const TestPreview: React.FC = () => {
   const { testId } = useParams<{ testId: string }>();
@@ -113,28 +114,28 @@ export const TestPreview: React.FC = () => {
                     <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Quantity A</span>
                     <div className="text-base font-bold text-slate-900 bg-white p-3.5 rounded-lg border border-slate-200 space-y-3">
                       {currentQ.quantity_a && <div>{currentQ.quantity_a}</div>}
-                      {(currentQ.quantity_a_images || (currentQ.quantity_a_image ? [currentQ.quantity_a_image] : []))?.length > 0 && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {(currentQ.quantity_a_images || [currentQ.quantity_a_image!]).map((url, idx) => (
-                            <img key={idx} src={url} alt={`Quantity A ${idx + 1}`} className="max-h-40 object-contain rounded-lg border border-slate-200 p-1 bg-slate-50" />
+                      {filterValidImages(currentQ.quantity_a_images || currentQ.quantity_a_image).length > 0 && (
+                        <div className="grid grid-cols-1 gap-2 pt-1">
+                          {filterValidImages(currentQ.quantity_a_images || currentQ.quantity_a_image).map((url, idx) => (
+                            <img key={idx} src={url} alt={`Quantity A Visual ${idx + 1}`} className="max-h-56 object-contain rounded-xl border border-slate-200 p-2 bg-white shadow-sm" />
                           ))}
                         </div>
                       )}
-                      {!currentQ.quantity_a && !(currentQ.quantity_a_images?.length || currentQ.quantity_a_image) && <div>—</div>}
+                      {!currentQ.quantity_a && filterValidImages(currentQ.quantity_a_images || currentQ.quantity_a_image).length === 0 && <div>—</div>}
                     </div>
                   </div>
                   <div className="space-y-1.5">
                     <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Quantity B</span>
                     <div className="text-base font-bold text-slate-900 bg-white p-3.5 rounded-lg border border-slate-200 space-y-3">
                       {currentQ.quantity_b && <div>{currentQ.quantity_b}</div>}
-                      {(currentQ.quantity_b_images || (currentQ.quantity_b_image ? [currentQ.quantity_b_image] : []))?.length > 0 && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {(currentQ.quantity_b_images || [currentQ.quantity_b_image!]).map((url, idx) => (
-                            <img key={idx} src={url} alt={`Quantity B ${idx + 1}`} className="max-h-40 object-contain rounded-lg border border-slate-200 p-1 bg-slate-50" />
+                      {filterValidImages(currentQ.quantity_b_images || currentQ.quantity_b_image).length > 0 && (
+                        <div className="grid grid-cols-1 gap-2 pt-1">
+                          {filterValidImages(currentQ.quantity_b_images || currentQ.quantity_b_image).map((url, idx) => (
+                            <img key={idx} src={url} alt={`Quantity B Visual ${idx + 1}`} className="max-h-56 object-contain rounded-xl border border-slate-200 p-2 bg-white shadow-sm" />
                           ))}
                         </div>
                       )}
-                      {!currentQ.quantity_b && !(currentQ.quantity_b_images?.length || currentQ.quantity_b_image) && <div>—</div>}
+                      {!currentQ.quantity_b && filterValidImages(currentQ.quantity_b_images || currentQ.quantity_b_image).length === 0 && <div>—</div>}
                     </div>
                   </div>
                 </div>

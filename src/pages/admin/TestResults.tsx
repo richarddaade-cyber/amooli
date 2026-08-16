@@ -20,6 +20,7 @@ import {
   BookOpen,
   Printer,
 } from 'lucide-react';
+import { filterValidImages } from '../../components/admin/QuestionBuilder';
 
 export const TestResults: React.FC = () => {
   const { testId } = useParams<{ testId: string }>();
@@ -435,9 +436,9 @@ export const TestResults: React.FC = () => {
                           <p className="text-sm font-semibold text-slate-900 leading-relaxed">{q.prompt}</p>
 
                           {/* Render Question Prompt Images (Full Support for Export) */}
-                          {(q.image_urls || (q.image_url ? [q.image_url] : []))?.length > 0 && (
+                          {filterValidImages(q.image_urls || q.image_url).length > 0 && (
                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-1">
-                              {(q.image_urls || [q.image_url!]).map((imgUrl, imgIdx) => (
+                              {filterValidImages(q.image_urls || q.image_url).map((imgUrl, imgIdx) => (
                                 <div key={imgIdx} className="border border-slate-200 rounded-xl overflow-hidden bg-white p-2 shadow-sm">
                                   <img src={imgUrl} alt={`Question Diagram ${imgIdx + 1}`} className="max-h-48 object-contain rounded-lg mx-auto" />
                                 </div>
@@ -452,10 +453,10 @@ export const TestResults: React.FC = () => {
                                 <span className="text-[11px] font-bold text-slate-500 uppercase">Quantity A</span>
                                 <div className="p-3 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-900 space-y-2">
                                   {q.quantity_a && <div>{q.quantity_a}</div>}
-                                  {(q.quantity_a_images || (q.quantity_a_image ? [q.quantity_a_image] : []))?.length > 0 && (
-                                    <div className="grid grid-cols-1 gap-2">
-                                      {(q.quantity_a_images || [q.quantity_a_image!]).map((url, idx) => (
-                                        <img key={idx} src={url} alt={`Quantity A ${idx + 1}`} className="max-h-36 object-contain rounded border p-1" />
+                                  {filterValidImages(q.quantity_a_images || q.quantity_a_image).length > 0 && (
+                                    <div className="grid grid-cols-1 gap-2 pt-1">
+                                      {filterValidImages(q.quantity_a_images || q.quantity_a_image).map((url, idx) => (
+                                        <img key={idx} src={url} alt={`Quantity A Diagram ${idx + 1}`} className="max-h-44 object-contain rounded-lg border border-slate-200 p-1 bg-white" />
                                       ))}
                                     </div>
                                   )}
@@ -465,10 +466,10 @@ export const TestResults: React.FC = () => {
                                 <span className="text-[11px] font-bold text-slate-500 uppercase">Quantity B</span>
                                 <div className="p-3 bg-white border border-slate-200 rounded-lg text-sm font-bold text-slate-900 space-y-2">
                                   {q.quantity_b && <div>{q.quantity_b}</div>}
-                                  {(q.quantity_b_images || (q.quantity_b_image ? [q.quantity_b_image] : []))?.length > 0 && (
-                                    <div className="grid grid-cols-1 gap-2">
-                                      {(q.quantity_b_images || [q.quantity_b_image!]).map((url, idx) => (
-                                        <img key={idx} src={url} alt={`Quantity B ${idx + 1}`} className="max-h-36 object-contain rounded border p-1" />
+                                  {filterValidImages(q.quantity_b_images || q.quantity_b_image).length > 0 && (
+                                    <div className="grid grid-cols-1 gap-2 pt-1">
+                                      {filterValidImages(q.quantity_b_images || q.quantity_b_image).map((url, idx) => (
+                                        <img key={idx} src={url} alt={`Quantity B Diagram ${idx + 1}`} className="max-h-44 object-contain rounded-lg border border-slate-200 p-1 bg-white" />
                                       ))}
                                     </div>
                                   )}

@@ -31,6 +31,12 @@ function generateUuid(): string {
   });
 }
 
+export function filterValidImages(urls: any): string[] {
+  if (!urls) return [];
+  const list = Array.isArray(urls) ? urls : [urls];
+  return list.filter((u) => typeof u === 'string' && u.trim().length > 0 && u !== 'null' && u !== 'undefined');
+}
+
 export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
   question = {},
   passages = [],
@@ -42,18 +48,15 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
   );
   const [prompt, setPrompt] = useState(question.prompt || '');
   const [imageUrls, setImageUrls] = useState<string[]>(() => {
-    if (question.image_urls && question.image_urls.length > 0) return question.image_urls;
-    return question.image_url ? [question.image_url] : [];
+    return filterValidImages(question.image_urls || question.image_url);
   });
   const [quantityA, setQuantityA] = useState(question.quantity_a || '');
   const [quantityB, setQuantityB] = useState(question.quantity_b || '');
   const [quantityAImages, setQuantityAImages] = useState<string[]>(() => {
-    if (question.quantity_a_images && question.quantity_a_images.length > 0) return question.quantity_a_images;
-    return question.quantity_a_image ? [question.quantity_a_image] : [];
+    return filterValidImages(question.quantity_a_images || question.quantity_a_image);
   });
   const [quantityBImages, setQuantityBImages] = useState<string[]>(() => {
-    if (question.quantity_b_images && question.quantity_b_images.length > 0) return question.quantity_b_images;
-    return question.quantity_b_image ? [question.quantity_b_image] : [];
+    return filterValidImages(question.quantity_b_images || question.quantity_b_image);
   });
   const [numericAnswer, setNumericAnswer] = useState<number | string>(
     question.numeric_answer !== undefined ? question.numeric_answer : ''
@@ -201,6 +204,10 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
       .map((val) => parseFloat(String(val).trim()))
       .filter((val) => !isNaN(val));
 
+    const validPromptImages = filterValidImages(imageUrls);
+    const validQAImages = filterValidImages(quantityAImages);
+    const validQBImages = filterValidImages(quantityBImages);
+
     const qId = question.id || generateUuid();
 
     const compiledQuestion: Question = {
@@ -209,14 +216,14 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
       passage_id: passageId || undefined,
       question_type: questionType,
       prompt,
-      image_url: imageUrls[0] || undefined,
-      image_urls: imageUrls.length > 0 ? imageUrls : undefined,
+      image_url: validPromptImages[0] || undefined,
+      image_urls: validPromptImages.length > 0 ? validPromptImages : undefined,
       quantity_a: questionType === 'QUANTITATIVE_COMPARISON' ? quantityA : undefined,
       quantity_b: questionType === 'QUANTITATIVE_COMPARISON' ? quantityB : undefined,
-      quantity_a_image: questionType === 'QUANTITATIVE_COMPARISON' ? quantityAImages[0] || undefined : undefined,
-      quantity_a_images: questionType === 'QUANTITATIVE_COMPARISON' && quantityAImages.length > 0 ? quantityAImages : undefined,
-      quantity_b_image: questionType === 'QUANTITATIVE_COMPARISON' ? quantityBImages[0] || undefined : undefined,
-      quantity_b_images: questionType === 'QUANTITATIVE_COMPARISON' && quantityBImages.length > 0 ? quantityBImages : undefined,
+      quantity_a_image: questionType === 'QUANTITATIVE_COMPARISON' ? validQAImages[0] || undefined : undefined,
+      quantity_a_images: questionType === 'QUANTITATIVE_COMPARISON' && validQAImages.length > 0 ? validQAImages : undefined,
+      quantity_b_image: questionType === 'QUANTITATIVE_COMPARISON' ? validQBImages[0] || undefined : undefined,
+      quantity_b_images: questionType === 'QUANTITATIVE_COMPARISON' && validQBImages.length > 0 ? validQBImages : undefined,
       numeric_answer: questionType === 'NUMERIC_ENTRY' ? parsedAnswers[0] : undefined,
       accepted_numeric_answers: questionType === 'NUMERIC_ENTRY' ? parsedAnswers : undefined,
       numeric_tolerance: questionType === 'NUMERIC_ENTRY' ? Number(numericTolerance) : undefined,
