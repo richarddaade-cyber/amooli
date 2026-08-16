@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { getSupabaseClient } from '../lib/supabase';
 import {
   Test,
   Section,
@@ -22,7 +22,8 @@ export const supabaseDb = {
    * Fetch all tests from Supabase PostgreSQL database
    */
   async getTests(): Promise<Test[]> {
-    const { data: tests, error } = await supabase
+    const client = getSupabaseClient();
+    const { data: tests, error } = await client
       .from('tests')
       .select('*, sections(count), attempts(count)')
       .order('created_at', { ascending: false });
@@ -41,10 +42,27 @@ export const supabaseDb = {
   },
 
   /**
+   * Fetch test by Access Code from Supabase
+   */
+  async getTestByAccessCode(code: string): Promise<TestFullDetails | null> {
+    const cleanCode = code.trim().toUpperCase();
+    const client = getSupabaseClient();
+    const { data: test, error } = await client
+      .from('tests')
+      .select('id')
+      .ilike('access_code', cleanCode)
+      .maybeSingle();
+
+    if (error || !test) return null;
+    return this.getTestFullDetails(test.id);
+  },
+
+  /**
    * Fetch complete test bundle (Test, Sections, Passages, Questions, Options) from Supabase
    */
   async getTestFullDetails(testId: string): Promise<TestFullDetails | null> {
-    const { data: test, error: tErr } = await supabase
+    const client = getSupabaseClient();
+    const { data: test, error: tErr } = await client
       .from('tests')
       .select('*')
       .eq('id', testId)
@@ -52,7 +70,7 @@ export const supabaseDb = {
 
     if (tErr || !test) return null;
 
-    const { data: sections } = await supabase
+    const { data: sections } = await client
       .from('sections')
       .select('*')
       .eq('test_id', testId)
@@ -61,13 +79,13 @@ export const supabaseDb = {
     const fullSections: (Section & { questions: Question[]; passages: Passage[] })[] = [];
 
     for (const sec of sections || []) {
-      const { data: passages } = await supabase
+      const { data: passages } = await client
         .from('passages')
         .select('*')
         .eq('section_id', sec.id)
         .order('position', { ascending: true });
 
-      const { data: questions } = await supabase
+      const { data: questions } = await client
         .from('questions')
         .select('*')
         .eq('section_id', sec.id)
@@ -75,7 +93,7 @@ export const supabaseDb = {
 
       const fullQuestions: Question[] = [];
       for (const q of questions || []) {
-        const { data: options } = await supabase
+        const { data: options } = await client
           .from('options')
           .select('*')
           .eq('question_id', q.id)
@@ -104,10 +122,11 @@ export const supabaseDb = {
    * Save / Upsert full test bundle into Supabase PostgreSQL database
    */
   async saveTestBundle(bundle: TestFullDetails): Promise<TestFullDetails> {
+    const client = getSupabaseClient();
     const { test, sections } = bundle;
 
     // 1. Upsert Test row
-    const { error: testErr } = await supabase.from('tests').upsert({
+    const { error: testErr } = await client.from('tests').upsert({
       id: test.id,
       title: test.title,
       description: test.description,
@@ -133,7 +152,7 @@ export const supabaseDb = {
 
     // 2. Upsert Sections, Passages, Questions, Options
     for (const sec of sections) {
-      const { error: secErr } = await supabase.from('sections').upsert({
+      const { error: secErr } = await client.from('sections').upsert({
         id: sec.id,
         test_id: test.id,
         title: sec.title,
@@ -143,7 +162,7 @@ export const supabaseDb = {
       if (secErr) throw new Error(`Failed to save section "${sec.title}": ${secErr.message}`);
 
       for (const pas of sec.passages || []) {
-        const { error: pasErr } = await supabase.from('passages').upsert({
+        const { error: pasErr } = await client.from('passages').upsert({
           id: pas.id,
           section_id: sec.id,
           title: pas.title,
@@ -156,20 +175,19 @@ export const supabaseDb = {
       // Sync questions by pruning any deleted questions for this section from Supabase
       const currentQuestionIds = (sec.questions || []).map((q) => q.id);
       if (currentQuestionIds.length > 0) {
-        // Fetch existing question IDs in Supabase for this section
-        const { data: dbQs } = await supabase.from('questions').select('id').eq('section_id', sec.id);
+        const { data: dbQs } = await client.from('questions').select('id').eq('section_id', sec.id);
         if (dbQs && dbQs.length > 0) {
           const toDelete = dbQs.filter((item) => !currentQuestionIds.includes(item.id));
           for (const item of toDelete) {
-            await supabase.from('questions').delete().eq('id', item.id);
+            await client.from('questions').delete().eq('id', item.id);
           }
         }
       } else {
-        await supabase.from('questions').delete().eq('section_id', sec.id);
+        await client.from('questions').delete().eq('section_id', sec.id);
       }
 
       for (const q of sec.questions || []) {
-        const { error: qErr } = await supabase.from('questions').upsert({
+        const { error: qErr } = await client.from('questions').upsert({
           id: q.id,
           section_id: sec.id,
           passage_id: q.passage_id || null,
@@ -179,36 +197,24 @@ export const supabaseDb = {
           image_urls: q.image_urls || null,
           quantity_a: q.quantity_a || null,
           quantity_b: q.quantity_b || null,
-          quantity_a_image: q.quantity_a_image || null,
-          quantity_a_images: q.quantity_a_images || null,
-          quantity_b_image: q.quantity_b_image || null,
-          quantity_b_images: q.quantity_b_images || null,
           numeric_answer: q.numeric_answer !== undefined ? q.numeric_answer : null,
-          accepted_numeric_answers: q.accepted_numeric_answers || null,
-          numeric_tolerance: q.numeric_tolerance !== undefined ? q.numeric_tolerance : null,
+          numeric_tolerance: q.numeric_tolerance || 0,
           explanation: q.explanation || null,
-          points: q.points,
+          points: q.points || 1.0,
           position: q.position,
-          updated_at: new Date().toISOString(),
         });
+        if (qErr) throw new Error(`Failed to save question: ${qErr.message}`);
 
-        if (qErr) {
-          console.error(`Error saving question ${q.id} to Supabase:`, qErr);
-          throw new Error(`Failed to save question "${q.prompt.slice(0, 25)}...": ${qErr.message}`);
-        }
-
-        // Save options for this question
+        // Sync options
+        await client.from('options').delete().eq('question_id', q.id);
         for (const opt of q.options || []) {
-          const { error: optErr } = await supabase.from('options').upsert({
+          await client.from('options').insert({
             id: opt.id,
             question_id: q.id,
             option_text: opt.option_text,
-            image_url: opt.image_url || null,
-            image_urls: opt.image_urls || null,
             is_correct: opt.is_correct,
             position: opt.position,
           });
-          if (optErr) console.warn(`Option save warning for option ${opt.id}:`, optErr);
         }
       }
     }
@@ -217,57 +223,165 @@ export const supabaseDb = {
   },
 
   /**
-   * Delete Question from Supabase
+   * Admin Invalidate Access Code in Supabase
    */
-  async deleteQuestion(questionId: string): Promise<void> {
-    const { error } = await supabase.from('questions').delete().eq('id', questionId);
-    if (error) console.error('Error deleting question from Supabase:', error);
+  async invalidateAccessCode(testId: string): Promise<boolean> {
+    const client = getSupabaseClient();
+    try {
+      await client.from('tests').update({ is_code_active: false }).eq('id', testId);
+      return true;
+    } catch (e) {
+      return false;
+    }
   },
 
   /**
-   * Delete Section from Supabase
-   */
-  async deleteSection(sectionId: string): Promise<void> {
-    await supabase.from('sections').delete().eq('id', sectionId);
-  },
-
-  /**
-   * Invalidate Access Code (Admin action)
-   */
-  async invalidateAccessCode(testId: string): Promise<void> {
-    await supabase.from('tests').update({ is_code_active: false, updated_at: new Date().toISOString() }).eq('id', testId);
-  },
-
-  /**
-   * Regenerate Access Code (Admin action)
+   * Admin Regenerate Access Code in Supabase
    */
   async regenerateAccessCode(testId: string): Promise<string> {
+    const client = getSupabaseClient();
     const newCode = generateAccessCode();
-    await supabase.from('tests').update({ access_code: newCode, is_code_active: true, updated_at: new Date().toISOString() }).eq('id', testId);
+    try {
+      await client.from('tests').update({ access_code: newCode, is_code_active: true }).eq('id', testId);
+    } catch (e) {}
     return newCode;
   },
 
   /**
-   * Update Test Status in Supabase (e.g. Publish / Activate / Close)
+   * Delete a Question from Supabase PostgreSQL database
    */
-  async updateTestStatus(testId: string, status: TestStatus): Promise<void> {
-    const payload: any = {
-      status,
-      updated_at: new Date().toISOString(),
-    };
-
-    if (status === 'ACTIVE') {
-      const code = generateAccessCode();
-      payload.access_code = code;
+  async deleteQuestion(questionId: string): Promise<boolean> {
+    const client = getSupabaseClient();
+    try {
+      await client.from('options').delete().eq('question_id', questionId);
+      await client.from('questions').delete().eq('id', questionId);
+      return true;
+    } catch (e) {
+      console.warn('Error deleting question from Supabase:', e);
+      return false;
     }
-
-    await supabase.from('tests').update(payload).eq('id', testId);
   },
 
   /**
-   * Delete Test from Supabase
+   * Delete a Section from Supabase
    */
-  async deleteTest(testId: string): Promise<void> {
-    await supabase.from('tests').delete().eq('id', testId);
+  async deleteSection(sectionId: string): Promise<boolean> {
+    const client = getSupabaseClient();
+    try {
+      await client.from('questions').delete().eq('section_id', sectionId);
+      await client.from('sections').delete().eq('id', sectionId);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  /**
+   * Update Test Status in Supabase
+   */
+  async updateTestStatus(testId: string, status: TestStatus): Promise<boolean> {
+    const client = getSupabaseClient();
+    try {
+      await client.from('tests').update({ status, updated_at: new Date().toISOString() }).eq('id', testId);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  /**
+   * Delete a Test from Supabase
+   */
+  async deleteTest(testId: string): Promise<boolean> {
+    const client = getSupabaseClient();
+    try {
+      await client.from('tests').delete().eq('id', testId);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  /**
+   * Start a candidate test attempt in Supabase
+   */
+  async startAttempt(testId: string, candidateName: string, candidateEmail?: string): Promise<Attempt> {
+    const client = getSupabaseClient();
+    const attemptId = `att-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+    const now = new Date().toISOString();
+    const newAttempt: Attempt = {
+      id: attemptId,
+      test_id: testId,
+      candidate_name: candidateName,
+      candidate_email: candidateEmail,
+      started_at: now,
+      expires_at: new Date(Date.now() + 180 * 60 * 1000).toISOString(),
+      status: 'IN_PROGRESS',
+      score: 0,
+      max_score: 0,
+      percentage: 0,
+      created_at: now,
+    };
+
+    const { error } = await client.from('attempts').insert(newAttempt);
+    if (error) {
+      console.warn('Supabase start attempt notice:', error.message);
+    }
+
+    return newAttempt;
+  },
+
+  /**
+   * Submit attempt answers to Supabase
+   */
+  async submitAttempt(
+    attemptId: string,
+    answersMap: Record<string, Answer>,
+    testBundle: TestFullDetails
+  ): Promise<Attempt> {
+    const client = getSupabaseClient();
+    const allQuestions: Question[] = testBundle.sections.flatMap((s) => s.questions || []);
+    const scored = calculateAttemptScore(allQuestions, answersMap);
+    const now = new Date().toISOString();
+
+    const { data: attempt } = await client
+      .from('attempts')
+      .select('*')
+      .eq('id', attemptId)
+      .single();
+
+    const updatedAttempt: Attempt = {
+      ...(attempt || {}),
+      id: attemptId,
+      test_id: testBundle.test.id,
+      candidate_name: attempt?.candidate_name || 'Candidate',
+      candidate_email: attempt?.candidate_email,
+      started_at: attempt?.started_at || now,
+      expires_at: attempt?.expires_at || now,
+      submitted_at: now,
+      status: 'SUBMITTED',
+      score: scored.score,
+      max_score: scored.maxScore,
+      percentage: scored.percentage,
+      created_at: attempt?.created_at || now,
+    };
+
+    await client.from('attempts').upsert(updatedAttempt);
+    return updatedAttempt;
+  },
+
+  /**
+   * Fetch attempts for a test from Supabase
+   */
+  async getTestAttempts(testId: string): Promise<Attempt[]> {
+    const client = getSupabaseClient();
+    const { data, error } = await client
+      .from('attempts')
+      .select('*')
+      .eq('test_id', testId)
+      .order('started_at', { ascending: false });
+
+    if (error) return [];
+    return data || [];
   },
 };

@@ -302,10 +302,41 @@ export const dbService = {
   },
 
   /**
-   * Get test bundle by Access Code with Time-bounded, Max Uses, & Admin Invalidation checking
+   * Get test bundle by Access Code from Cloud Database (Multi-Device) & Local Store Fallback
    */
   async getTestByAccessCode(code: string): Promise<{ bundle: TestFullDetails | null; error?: string }> {
     const cleanCode = code.trim().toUpperCase();
+
+    // 1. Query Supabase Cloud Database first (Multi-Device Support for Phone, Laptop, Tablet)
+    try {
+      const dbBundle = await supabaseDb.getTestByAccessCode(cleanCode);
+      if (dbBundle) {
+        const t = dbBundle.test;
+        if (t.is_code_active === false) {
+          return { bundle: null, error: 'This test access code has been invalidated by the administrator.' };
+        }
+        if (t.status !== 'ACTIVE' && t.status !== 'PUBLISHED') {
+          return { bundle: null, error: 'This test is currently not active.' };
+        }
+        if (t.code_expires_at) {
+          const expiresMs = new Date(t.code_expires_at).getTime();
+          if (Date.now() > expiresMs) {
+            return { bundle: null, error: `This access code expired on ${new Date(t.code_expires_at).toLocaleString()}.` };
+          }
+        }
+        if (t.code_max_uses !== undefined && t.code_max_uses !== null && t.code_max_uses > 0) {
+          const currentUses = t.code_current_uses || 0;
+          if (currentUses >= t.code_max_uses) {
+            return { bundle: null, error: `This access code has reached its maximum usage limit (${t.code_max_uses} candidate joins).` };
+          }
+        }
+        return { bundle: sanitizeBundle(dbBundle) };
+      }
+    } catch (e) {
+      console.warn('Supabase getTestByAccessCode notice:', e);
+    }
+
+    // 2. Fallback to Local Storage
     const bundles = getStoredTestBundles();
     const found = bundles.find((b) => b.test.access_code?.toUpperCase() === cleanCode);
 
@@ -315,17 +346,14 @@ export const dbService = {
 
     const t = found.test;
 
-    // 1. Check Admin Invalidation Flag
     if (t.is_code_active === false) {
       return { bundle: null, error: 'This test access code has been invalidated by the administrator.' };
     }
 
-    // 2. Check Test Status
     if (t.status !== 'ACTIVE' && t.status !== 'PUBLISHED') {
       return { bundle: null, error: 'This test is currently not active.' };
     }
 
-    // 3. Check Time Bounded Expiration
     if (t.code_expires_at) {
       const expiresMs = new Date(t.code_expires_at).getTime();
       if (Date.now() > expiresMs) {
@@ -333,7 +361,6 @@ export const dbService = {
       }
     }
 
-    // 4. Check Number of Uses Bounded Limit
     if (t.code_max_uses !== undefined && t.code_max_uses !== null && t.code_max_uses > 0) {
       const currentUses = t.code_current_uses || 0;
       if (currentUses >= t.code_max_uses) {
@@ -341,7 +368,7 @@ export const dbService = {
       }
     }
 
-    return { bundle: found };
+    return { bundle: sanitizeBundle(found) };
   },
 
   /**
