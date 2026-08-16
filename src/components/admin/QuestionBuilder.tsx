@@ -33,8 +33,25 @@ function generateUuid(): string {
 
 export function filterValidImages(urls: any): string[] {
   if (!urls) return [];
-  const list = Array.isArray(urls) ? urls : [urls];
-  return list.filter((u) => typeof u === 'string' && u.trim().length > 0 && u !== 'null' && u !== 'undefined');
+  let list: any[] = [];
+  if (Array.isArray(urls)) {
+    list = urls;
+  } else if (typeof urls === 'string') {
+    if (urls.includes('|||')) {
+      list = urls.split('|||');
+    } else if (urls.startsWith('[') && urls.endsWith(']')) {
+      try {
+        list = JSON.parse(urls);
+      } catch (e) {
+        list = [urls];
+      }
+    } else {
+      list = [urls];
+    }
+  }
+  return list
+    .filter((u) => typeof u === 'string' && u.trim().length > 0 && u !== 'null' && u !== 'undefined')
+    .map((u) => u.trim());
 }
 
 export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({

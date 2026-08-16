@@ -27,8 +27,25 @@ function generateUuid(): string {
 
 function filterValidImages(urls: any): string[] {
   if (!urls) return [];
-  const list = Array.isArray(urls) ? urls : [urls];
-  return list.filter((u) => typeof u === 'string' && u.trim().length > 0 && u !== 'null' && u !== 'undefined');
+  let list: any[] = [];
+  if (Array.isArray(urls)) {
+    list = urls;
+  } else if (typeof urls === 'string') {
+    if (urls.includes('|||')) {
+      list = urls.split('|||');
+    } else if (urls.startsWith('[') && urls.endsWith(']')) {
+      try {
+        list = JSON.parse(urls);
+      } catch (e) {
+        list = [urls];
+      }
+    } else {
+      list = [urls];
+    }
+  }
+  return list
+    .filter((u) => typeof u === 'string' && u.trim().length > 0 && u !== 'null' && u !== 'undefined')
+    .map((u) => u.trim());
 }
 
 /**
@@ -129,8 +146,18 @@ export const supabaseDb = {
           .eq('question_id', q.id)
           .order('position', { ascending: true });
 
+        const qaImgs = filterValidImages(q.quantity_a_images || q.quantity_a_image);
+        const qbImgs = filterValidImages(q.quantity_b_images || q.quantity_b_image);
+        const promptImgs = filterValidImages(q.image_urls || q.image_url);
+
         fullQuestions.push({
           ...q,
+          image_url: promptImgs[0] || q.image_url,
+          image_urls: promptImgs,
+          quantity_a_image: qaImgs[0] || q.quantity_a_image,
+          quantity_a_images: qaImgs,
+          quantity_b_image: qbImgs[0] || q.quantity_b_image,
+          quantity_b_images: qbImgs,
           options: options || [],
         });
       }
@@ -237,11 +264,11 @@ export const supabaseDb = {
           passage_id: q.passage_id || null,
           question_type: q.question_type,
           prompt: q.prompt,
-          image_url: validPrompt[0] || null,
+          image_url: validPrompt.length > 0 ? validPrompt.join('|||') : null,
           quantity_a: q.quantity_a || null,
           quantity_b: q.quantity_b || null,
-          quantity_a_image: validQA[0] || null,
-          quantity_b_image: validQB[0] || null,
+          quantity_a_image: validQA.length > 0 ? validQA.join('|||') : null,
+          quantity_b_image: validQB.length > 0 ? validQB.join('|||') : null,
           numeric_answer: q.numeric_answer !== undefined && (q.numeric_answer as any) !== '' && q.numeric_answer !== null ? Number(q.numeric_answer) : null,
           numeric_tolerance: q.numeric_tolerance || 0,
           explanation: q.explanation || null,
@@ -249,22 +276,11 @@ export const supabaseDb = {
           position: q.position || 1,
         };
 
-        if (validPrompt.length > 0) qRow.image_urls = validPrompt;
-        if (validQA.length > 0) qRow.quantity_a_images = validQA;
-        if (validQB.length > 0) qRow.quantity_b_images = validQB;
-
-        let { error: qErr } = await client.from('questions').upsert(qRow);
-        if (qErr && qErr.code === 'PGRST204') {
-          delete qRow.image_urls;
-          delete qRow.quantity_a_image;
-          delete qRow.quantity_a_images;
-          delete qRow.quantity_b_image;
-          delete qRow.quantity_b_images;
-          const fallbackRes = await client.from('questions').upsert(qRow);
-          qErr = fallbackRes.error;
+        const { error: qErr } = await client.from('questions').upsert(qRow);
+        if (qErr) {
+          console.error('Error saving question row to Supabase:', qErr);
+          throw new Error(`Failed to save question: ${qErr.message}`);
         }
-
-        if (qErr) throw new Error(`Failed to save question: ${qErr.message}`);
 
         // Sync options
         await client.from('options').delete().eq('question_id', q.id);
