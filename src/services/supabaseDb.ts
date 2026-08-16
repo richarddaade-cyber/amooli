@@ -341,14 +341,44 @@ export const supabaseDb = {
   },
 
   /**
-   * Delete a Test from Supabase
+   * Delete a Test permanently from Supabase PostgreSQL database
    */
   async deleteTest(testId: string): Promise<boolean> {
     const client = getSupabaseClient();
     try {
-      await client.from('tests').delete().eq('id', testId);
+      // 1. Delete associated attempts, answers, event_logs
+      const { data: atts } = await client.from('attempts').select('id').eq('test_id', testId);
+      if (atts && atts.length > 0) {
+        for (const att of atts) {
+          await client.from('answers').delete().eq('attempt_id', att.id);
+          await client.from('event_logs').delete().eq('attempt_id', att.id);
+        }
+        await client.from('attempts').delete().eq('test_id', testId);
+      }
+
+      // 2. Delete sections, questions, options, passages
+      const { data: secs } = await client.from('sections').select('id').eq('test_id', testId);
+      if (secs && secs.length > 0) {
+        for (const sec of secs) {
+          const { data: qs } = await client.from('questions').select('id').eq('section_id', sec.id);
+          if (qs && qs.length > 0) {
+            for (const q of qs) {
+              await client.from('options').delete().eq('question_id', q.id);
+            }
+            await client.from('questions').delete().eq('section_id', sec.id);
+          }
+          await client.from('passages').delete().eq('section_id', sec.id);
+        }
+        await client.from('sections').delete().eq('test_id', testId);
+      }
+
+      // 3. Delete primary test row
+      const { error: tErr } = await client.from('tests').delete().eq('id', testId);
+      if (tErr) throw new Error(tErr.message);
+
       return true;
-    } catch (e) {
+    } catch (e: any) {
+      console.error('Error deleting test from Supabase:', e);
       return false;
     }
   },
