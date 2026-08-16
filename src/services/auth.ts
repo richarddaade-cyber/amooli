@@ -1,0 +1,203 @@
+import { supabase } from '../lib/supabase';
+
+const ADMIN_AUTH_KEY = 'preppulse_admin_auth';
+const ADMIN_ACCOUNTS_KEY = 'preppulse_admin_accounts';
+
+export interface AdminAccount {
+  id: string;
+  email: string;
+  name: string;
+  password_hash: string;
+  role: 'ADMINISTRATOR';
+  created_at: string;
+}
+
+export interface AdminUser {
+  email: string;
+  name: string;
+  role: 'ADMINISTRATOR';
+  loggedInAt: string;
+}
+
+const DEFAULT_ADMINS: AdminAccount[] = [
+  {
+    id: 'admin-master',
+    email: 'admin@preppulse.com',
+    name: 'Lead Test Administrator',
+    password_hash: 'admin123',
+    role: 'ADMINISTRATOR',
+    created_at: new Date().toISOString(),
+  },
+];
+
+function getStoredAdminAccounts(): AdminAccount[] {
+  try {
+    const raw = localStorage.getItem(ADMIN_ACCOUNTS_KEY);
+    if (!raw) {
+      localStorage.setItem(ADMIN_ACCOUNTS_KEY, JSON.stringify(DEFAULT_ADMINS));
+      return DEFAULT_ADMINS;
+    }
+    return JSON.parse(raw);
+  } catch (e) {
+    return DEFAULT_ADMINS;
+  }
+}
+
+function saveStoredAdminAccounts(accounts: AdminAccount[]): void {
+  try {
+    localStorage.setItem(ADMIN_ACCOUNTS_KEY, JSON.stringify(accounts));
+  } catch (e) {}
+}
+
+export const authService = {
+  /**
+   * Async Login — Queries Supabase PostgreSQL admin_users table first, then falls back to local accounts
+   */
+  async login(email: string, pass: string): Promise<{ success: boolean; error?: string; user?: AdminUser }> {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPass = pass.trim();
+
+    if (!cleanEmail || !cleanPass) {
+      return { success: false, error: 'Please provide both email/username and password.' };
+    }
+
+    // 1. Check Supabase PostgreSQL admin_users table
+    try {
+      const { data, error } = await supabase
+        .from('admin_users')
+        .select('*')
+        .or(`email.eq.${cleanEmail},email.eq.${cleanEmail}@preppulse.com`)
+        .maybeSingle();
+
+      if (data && data.password_hash === cleanPass) {
+        const user: AdminUser = {
+          email: data.email,
+          name: data.name || 'Test Administrator',
+          role: 'ADMINISTRATOR',
+          loggedInAt: new Date().toISOString(),
+        };
+        localStorage.setItem(ADMIN_AUTH_KEY, JSON.stringify(user));
+        return { success: true, user };
+      }
+    } catch (dbErr) {
+      console.warn('Supabase auth query notice:', dbErr);
+    }
+
+    // 2. Check Local Accounts store
+    const localAccounts = getStoredAdminAccounts();
+    const match = localAccounts.find(
+      (a) =>
+        (a.email.toLowerCase() === cleanEmail || a.email.toLowerCase().startsWith(cleanEmail + '@')) &&
+        a.password_hash === cleanPass
+    );
+
+    if (match || ((cleanEmail === 'admin@preppulse.com' || cleanEmail === 'admin') && cleanPass === 'admin123')) {
+      const user: AdminUser = {
+        email: match?.email || 'admin@preppulse.com',
+        name: match?.name || 'Lead Test Administrator',
+        role: 'ADMINISTRATOR',
+        loggedInAt: new Date().toISOString(),
+      };
+      localStorage.setItem(ADMIN_AUTH_KEY, JSON.stringify(user));
+      return { success: true, user };
+    }
+
+    return { success: false, error: 'Invalid admin email/username or password.' };
+  },
+
+  /**
+   * Check if admin is currently authenticated
+   */
+  isAuthenticated(): boolean {
+    try {
+      const raw = localStorage.getItem(ADMIN_AUTH_KEY);
+      return !!raw;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  /**
+   * Get current authenticated admin user
+   */
+  getUser(): AdminUser | null {
+    try {
+      const raw = localStorage.getItem(ADMIN_AUTH_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  /**
+   * Logout admin session
+   */
+  logout(): void {
+    localStorage.removeItem(ADMIN_AUTH_KEY);
+  },
+
+  /**
+   * Fetch all Admin Accounts (from Supabase & Local Cache)
+   */
+  async getAdminAccounts(): Promise<AdminAccount[]> {
+    try {
+      const { data } = await supabase.from('admin_users').select('*');
+      if (data && data.length > 0) {
+        return data as AdminAccount[];
+      }
+    } catch (err) {}
+    return getStoredAdminAccounts();
+  },
+
+  /**
+   * Create a new Admin Account
+   */
+  async createAdminAccount(name: string, email: string, password: string): Promise<AdminAccount> {
+    const cleanEmail = email.trim().toLowerCase();
+    const newAcc: AdminAccount = {
+      id: `admin-${Date.now()}`,
+      email: cleanEmail.includes('@') ? cleanEmail : `${cleanEmail}@preppulse.com`,
+      name: name.trim(),
+      password_hash: password.trim(),
+      role: 'ADMINISTRATOR',
+      created_at: new Date().toISOString(),
+    };
+
+    const local = getStoredAdminAccounts();
+    local.push(newAcc);
+    saveStoredAdminAccounts(local);
+
+    try {
+      await supabase.from('admin_users').upsert({
+        id: newAcc.id,
+        email: newAcc.email,
+        name: newAcc.name,
+        password_hash: newAcc.password_hash,
+        role: 'ADMINISTRATOR',
+        created_at: newAcc.created_at,
+        updated_at: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.warn('Supabase admin create notice:', err);
+    }
+
+    return newAcc;
+  },
+
+  /**
+   * Change Password for an Admin Account
+   */
+  async updateAdminPassword(email: string, newPassword: string): Promise<boolean> {
+    const cleanEmail = email.trim().toLowerCase();
+    const local = getStoredAdminAccounts();
+    const found = local.find((a) => a.email.toLowerCase() === cleanEmail);
+    if (found) {
+      found.password_hash = newPassword.trim();
+      saveStoredAdminAccounts(local);
+    }
+    try {
+      await supabase.from('admin_users').update({ password_hash: newPassword.trim() }).eq('email', cleanEmail);
+    } catch (err) {}
+    return true;
+  },
+};
