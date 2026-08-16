@@ -129,7 +129,7 @@ export const TestEditor: React.FC = () => {
               access_code: generateAccessCode(),
               is_code_active: true,
               duration_minutes: 30,
-              status: 'DRAFT',
+              status: 'PUBLISHED',
               max_attempts: 1,
               result_visibility: 'AFTER_SUBMISSION',
               randomize_questions: false,

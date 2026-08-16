@@ -316,8 +316,8 @@ export const dbService = {
         if (t.is_code_active === false) {
           return { bundle: null, error: 'This test access code has been invalidated by the administrator.' };
         }
-        if (t.status !== 'ACTIVE' && t.status !== 'PUBLISHED') {
-          return { bundle: null, error: 'This test is currently not active.' };
+        if (t.status === 'CLOSED') {
+          return { bundle: null, error: 'This test has been closed by the administrator.' };
         }
         if (t.code_expires_at) {
           const expiresMs = new Date(t.code_expires_at).getTime();
@@ -351,8 +351,8 @@ export const dbService = {
       return { bundle: null, error: 'This test access code has been invalidated by the administrator.' };
     }
 
-    if (t.status !== 'ACTIVE' && t.status !== 'PUBLISHED') {
-      return { bundle: null, error: 'This test is currently not active.' };
+    if (t.status === 'CLOSED') {
+      return { bundle: null, error: 'This test has been closed by the administrator.' };
     }
 
     if (t.code_expires_at) {
