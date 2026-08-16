@@ -162,9 +162,8 @@ export const TestEditor: React.FC = () => {
             ],
           };
           setBundle(newBundle);
-          dbService.saveTestBundle(newBundle).catch((err) => {
-            console.warn('Initial background save notice:', err);
-          });
+          await dbService.saveTestBundle(newBundle);
+          navigate(`/admin/tests/${newId}/edit`, { replace: true });
         }
       } catch (err: any) {
         console.error('Error loading test editor:', err);
