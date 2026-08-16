@@ -7,6 +7,7 @@ import {
   Passage,
   Attempt,
   Answer,
+  EventLog,
   TestStatus,
   TestFullDetails,
 } from '../types/database';
@@ -15,7 +16,7 @@ import { calculateAttemptScore } from './scoring';
 
 /**
  * Direct Supabase PostgreSQL Database Integration
- * Persists all created, edited, and published tests directly to Supabase PostgreSQL database tables.
+ * Persists all created, edited, and published tests, attempts, answers, event logs, and options directly to Supabase PostgreSQL database tables.
  */
 export const supabaseDb = {
   /**
@@ -309,13 +310,18 @@ export const supabaseDb = {
     const client = getSupabaseClient();
     const attemptId = `att-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
     const now = new Date().toISOString();
+
+    const { data: testData } = await client.from('tests').select('duration_minutes').eq('id', testId).single();
+    const duration = testData?.duration_minutes || 60;
+    const expiresAt = new Date(Date.now() + duration * 60 * 1000).toISOString();
+
     const newAttempt: Attempt = {
       id: attemptId,
       test_id: testId,
       candidate_name: candidateName,
       candidate_email: candidateEmail,
       started_at: now,
-      expires_at: new Date(Date.now() + 180 * 60 * 1000).toISOString(),
+      expires_at: expiresAt,
       status: 'IN_PROGRESS',
       score: 0,
       max_score: 0,
@@ -332,7 +338,86 @@ export const supabaseDb = {
   },
 
   /**
-   * Submit attempt answers to Supabase
+   * Fetch an Attempt by ID from Supabase
+   */
+  async getAttempt(attemptId: string): Promise<Attempt | null> {
+    const client = getSupabaseClient();
+    const { data: attempt, error } = await client
+      .from('attempts')
+      .select('*')
+      .eq('id', attemptId)
+      .maybeSingle();
+
+    if (error || !attempt) return null;
+
+    const { data: answers } = await client
+      .from('answers')
+      .select('*')
+      .eq('attempt_id', attemptId);
+
+    const answersMap: Record<string, Answer> = {};
+    (answers || []).forEach((ans: any) => {
+      answersMap[ans.question_id] = {
+        id: ans.id,
+        attempt_id: ans.attempt_id,
+        question_id: ans.question_id,
+        selected_option_ids: ans.selected_option_ids || (ans.selected_option_id ? [ans.selected_option_id] : []),
+        text_answer: ans.text_response || ans.text_answer || '',
+        is_marked_for_review: ans.is_marked_for_review || false,
+        is_correct: ans.is_correct,
+        score_awarded: ans.score_awarded,
+        updated_at: ans.created_at || ans.updated_at || new Date().toISOString(),
+      };
+    });
+
+    return {
+      ...attempt,
+      answers: answersMap,
+    };
+  },
+
+  /**
+   * Save / Autosave an answer row directly to Supabase answers table
+   */
+  async saveAnswer(
+    attemptId: string,
+    questionId: string,
+    payload: { selectedOptionIds?: string[]; textAnswer?: string; isMarkedForReview?: boolean }
+  ): Promise<Answer> {
+    const client = getSupabaseClient();
+    const answerId = `ans-${attemptId}-${questionId}`;
+    const now = new Date().toISOString();
+
+    const ansRow = {
+      id: answerId,
+      attempt_id: attemptId,
+      question_id: questionId,
+      selected_option_ids: payload.selectedOptionIds || [],
+      selected_option_id: payload.selectedOptionIds?.[0] || null,
+      text_response: payload.textAnswer || null,
+      is_marked_for_review: payload.isMarkedForReview || false,
+      updated_at: now,
+    };
+
+    try {
+      await client.from('answers').upsert(ansRow);
+    } catch (e) {
+      console.warn('Supabase saveAnswer notice:', e);
+    }
+
+    return {
+      id: answerId,
+      attempt_id: attemptId,
+      question_id: questionId,
+      selected_option_ids: payload.selectedOptionIds || [],
+      text_answer: payload.textAnswer || '',
+      is_marked_for_review: payload.isMarkedForReview || false,
+      updated_at: now,
+    };
+  },
+
+  /**
+   * Submit attempt answers to Supabase & calculate authoritative score
    */
   async submitAttempt(
     attemptId: string,
@@ -368,6 +453,46 @@ export const supabaseDb = {
 
     await client.from('attempts').upsert(updatedAttempt);
     return updatedAttempt;
+  },
+
+  /**
+   * Log Candidate Real-time Event to Supabase
+   */
+  async logEvent(attemptId: string, eventType: string, payload: Record<string, any>): Promise<EventLog> {
+    const client = getSupabaseClient();
+    const eventId = `evt-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    const now = new Date().toISOString();
+    const logItem: EventLog = {
+      id: eventId,
+      attempt_id: attemptId,
+      event_type: eventType as any,
+      payload,
+      created_at: now,
+    };
+
+    try {
+      await client.from('event_logs').insert(logItem);
+    } catch (e) {}
+
+    return logItem;
+  },
+
+  /**
+   * Fetch Real-time Event Logs for an Attempt from Supabase
+   */
+  async getEventLogs(attemptId: string): Promise<EventLog[]> {
+    const client = getSupabaseClient();
+    try {
+      const { data } = await client
+        .from('event_logs')
+        .select('*')
+        .eq('attempt_id', attemptId)
+        .order('created_at', { ascending: true });
+
+      return data || [];
+    } catch (e) {
+      return [];
+    }
   },
 
   /**

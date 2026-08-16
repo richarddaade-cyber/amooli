@@ -6,6 +6,7 @@ import {
   Passage,
   Attempt,
   Answer,
+  EventLog,
   TestStatus,
   TestFullDetails,
 } from '../types/database';
@@ -517,7 +518,7 @@ export const dbService = {
   },
 
   /**
-   * Start a candidate attempt
+   * Start a candidate attempt — Persists directly to Supabase Database & Local Storage
    */
   async startAttempt(testId: string, candidateName: string, candidateEmail?: string): Promise<Attempt> {
     const bundle = await this.getTestFullDetails(testId);
@@ -527,117 +528,181 @@ export const dbService = {
     bundle.test.code_current_uses = (bundle.test.code_current_uses || 0) + 1;
     await this.saveTestBundle(bundle);
 
+    let newAttempt: Attempt;
+    try {
+      newAttempt = await supabaseDb.startAttempt(testId, candidateName, candidateEmail);
+    } catch (e) {
+      const attemptId = `attempt-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+      const startedAt = new Date().toISOString();
+      const expiresAt = new Date(Date.now() + bundle.test.duration_minutes * 60 * 1000).toISOString();
+      newAttempt = {
+        id: attemptId,
+        test_id: testId,
+        candidate_name: candidateName,
+        candidate_email: candidateEmail,
+        status: 'IN_PROGRESS',
+        started_at: startedAt,
+        expires_at: expiresAt,
+        score: 0,
+        max_score: 0,
+        percentage: 0,
+        created_at: startedAt,
+        answers: {},
+      };
+    }
+
     const attempts = getStoredAttempts();
-    const attemptId = `attempt-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-    const startedAt = new Date().toISOString();
-    const expiresAt = new Date(Date.now() + bundle.test.duration_minutes * 60 * 1000).toISOString();
-
-    const newAttempt: Attempt = {
-      id: attemptId,
-      test_id: testId,
-      candidate_name: candidateName,
-      candidate_email: candidateEmail,
-      status: 'IN_PROGRESS',
-      started_at: startedAt,
-      expires_at: expiresAt,
-      score: 0,
-      max_score: 0,
-      percentage: 0,
-      created_at: startedAt,
-      answers: {},
-    };
-
-    attempts[attemptId] = newAttempt;
+    attempts[newAttempt.id] = newAttempt;
     saveStoredAttempts(attempts);
 
     return newAttempt;
   },
 
   /**
-   * Get an attempt by ID
+   * Get an attempt by ID — Queries Supabase Database first
    */
   async getAttempt(attemptId: string): Promise<Attempt | null> {
+    try {
+      const dbAttempt = await supabaseDb.getAttempt(attemptId);
+      if (dbAttempt) return dbAttempt;
+    } catch (e) {}
+
     const attempts = getStoredAttempts();
     return attempts[attemptId] || null;
   },
 
   /**
-   * Save / Autosave answer for a candidate question
+   * Save / Autosave answer for a candidate question — Persists to Supabase & Local Cache
    */
   async saveAnswer(
     attemptId: string,
     questionId: string,
     payload: { selectedOptionIds?: string[]; textAnswer?: string; isMarkedForReview?: boolean }
   ): Promise<Answer> {
+    // 1. Persist to Supabase PostgreSQL Database
+    try {
+      await supabaseDb.saveAnswer(attemptId, questionId, payload);
+    } catch (e) {}
+
+    // 2. Persist to Local Storage Cache
     const attempts = getStoredAttempts();
     const attempt = attempts[attemptId];
-    if (!attempt) throw new Error('Attempt not found.');
+    if (attempt) {
+      if (!attempt.answers) attempt.answers = {};
+      const existing = attempt.answers[questionId] || {
+        id: `ans-${attemptId}-${questionId}`,
+        attempt_id: attemptId,
+        question_id: questionId,
+        selected_option_ids: [],
+        text_answer: '',
+        is_marked_for_review: false,
+        updated_at: new Date().toISOString(),
+      };
 
-    if (attempt.status !== 'IN_PROGRESS') {
-      throw new Error('Attempt is already submitted or expired.');
+      if (payload.selectedOptionIds !== undefined) {
+        existing.selected_option_ids = payload.selectedOptionIds;
+      }
+      if (payload.textAnswer !== undefined) {
+        existing.text_answer = payload.textAnswer;
+      }
+      if (payload.isMarkedForReview !== undefined) {
+        existing.is_marked_for_review = payload.isMarkedForReview;
+      }
+
+      existing.updated_at = new Date().toISOString();
+      attempt.answers[questionId] = existing;
+      attempt.current_question_id = questionId;
+
+      saveStoredAttempts(attempts);
+      return existing;
     }
 
-    if (!attempt.answers) attempt.answers = {};
-    const existing = attempt.answers[questionId] || {
+    return {
       id: `ans-${attemptId}-${questionId}`,
       attempt_id: attemptId,
       question_id: questionId,
-      selected_option_ids: [],
-      text_answer: '',
-      is_marked_for_review: false,
+      selected_option_ids: payload.selectedOptionIds || [],
+      text_answer: payload.textAnswer || '',
+      is_marked_for_review: payload.isMarkedForReview || false,
       updated_at: new Date().toISOString(),
     };
-
-    if (payload.selectedOptionIds !== undefined) {
-      existing.selected_option_ids = payload.selectedOptionIds;
-    }
-    if (payload.textAnswer !== undefined) {
-      existing.text_answer = payload.textAnswer;
-    }
-    if (payload.isMarkedForReview !== undefined) {
-      existing.is_marked_for_review = payload.isMarkedForReview;
-    }
-
-    existing.updated_at = new Date().toISOString();
-    attempt.answers[questionId] = existing;
-    attempt.current_question_id = questionId;
-
-    saveStoredAttempts(attempts);
-    return existing;
   },
 
   /**
-   * Submit an attempt & auto-score
+   * Submit an attempt & auto-score — Persists to Supabase Database
    */
   async submitAttempt(attemptId: string, forceExpired = false): Promise<Attempt> {
-    const attempts = getStoredAttempts();
-    const attempt = attempts[attemptId];
+    const attempt = await this.getAttempt(attemptId);
     if (!attempt) throw new Error('Attempt not found.');
 
     const bundle = await this.getTestFullDetails(attempt.test_id);
     if (!bundle) throw new Error('Test definition missing.');
 
-    // Collect all questions
-    const allQuestions: Question[] = [];
-    bundle.sections.forEach((s) => allQuestions.push(...s.questions));
+    let submittedAttempt: Attempt;
+    try {
+      submittedAttempt = await supabaseDb.submitAttempt(attemptId, attempt.answers || {}, bundle);
+      if (forceExpired) {
+        submittedAttempt.status = 'EXPIRED';
+      }
+    } catch (e) {
+      const allQuestions: Question[] = [];
+      bundle.sections.forEach((s) => allQuestions.push(...s.questions));
+      const scoreResult = calculateAttemptScore(allQuestions, attempt.answers || {});
 
-    // Calculate score
-    const scoreResult = calculateAttemptScore(allQuestions, attempt.answers || {});
+      submittedAttempt = {
+        ...attempt,
+        status: forceExpired ? 'EXPIRED' : 'SUBMITTED',
+        submitted_at: new Date().toISOString(),
+        score: scoreResult.score,
+        max_score: scoreResult.maxScore,
+        percentage: scoreResult.percentage,
+      };
+    }
 
-    attempt.status = forceExpired ? 'EXPIRED' : 'SUBMITTED';
-    attempt.submitted_at = new Date().toISOString();
-    attempt.score = scoreResult.score;
-    attempt.max_score = scoreResult.maxScore;
-    attempt.percentage = scoreResult.percentage;
-
+    const attempts = getStoredAttempts();
+    attempts[attemptId] = submittedAttempt;
     saveStoredAttempts(attempts);
-    return attempt;
+
+    return submittedAttempt;
+  },
+
+  /**
+   * Log Candidate Event for Admin Monitoring
+   */
+  async logEvent(attemptId: string, eventType: string, payload: Record<string, any>): Promise<EventLog> {
+    try {
+      return await supabaseDb.logEvent(attemptId, eventType, payload);
+    } catch (e) {
+      return {
+        id: `evt-${Date.now()}`,
+        attempt_id: attemptId,
+        event_type: eventType as any,
+        payload,
+        created_at: new Date().toISOString(),
+      };
+    }
+  },
+
+  /**
+   * Fetch Real-time Event Logs for Monitoring
+   */
+  async getEventLogs(attemptId: string): Promise<EventLog[]> {
+    try {
+      const logs = await supabaseDb.getEventLogs(attemptId);
+      if (logs && logs.length > 0) return logs;
+    } catch (e) {}
+    return [];
   },
 
   /**
    * Get all candidate attempts for a specific test (for Admin Monitoring & Analytics)
    */
   async getTestAttempts(testId: string): Promise<Attempt[]> {
+    try {
+      const dbAttempts = await supabaseDb.getTestAttempts(testId);
+      if (dbAttempts && dbAttempts.length > 0) return dbAttempts;
+    } catch (e) {}
+
     const attempts = getStoredAttempts();
     return Object.values(attempts).filter((a) => a.test_id === testId);
   },
