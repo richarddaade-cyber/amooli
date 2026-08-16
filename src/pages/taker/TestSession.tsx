@@ -2,22 +2,17 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { dbService } from '../../services/db';
 import { calculateTimerStatus, TimerStatus } from '../../services/timer';
-import { Attempt, TestFullDetails, Question, Answer, Passage } from '../../types/database';
+import { Attempt, TestFullDetails, Question, Answer } from '../../types/database';
 import {
   Clock,
-  CheckCircle2,
   Bookmark,
   ChevronLeft,
   ChevronRight,
   Send,
   AlertTriangle,
   BookOpen,
-  HelpCircle,
   Menu,
-  X,
   FileCheck,
-  Shield,
-  Lock,
 } from 'lucide-react';
 
 export const TestSession: React.FC = () => {
@@ -28,11 +23,11 @@ export const TestSession: React.FC = () => {
   const [attempt, setAttempt] = useState<Attempt | null>(null);
   const [bundle, setBundle] = useState<TestFullDetails | null>(null);
 
-  // Active question navigation index
+  // Active section tracking & section-scoped question index
+  const [currentSectionIdx, setCurrentSectionIdx] = useState(0);
   const [activeQuestionIdx, setActiveQuestionIdx] = useState(0);
 
   // Section-level timing & intermission break states
-  const [currentSectionIdx, setCurrentSectionIdx] = useState(0);
   const [sectionStartedAt, setSectionStartedAt] = useState<string>('');
   const [isIntermission, setIsIntermission] = useState(false);
   const [breakSecondsRemaining, setBreakSecondsRemaining] = useState(120);
@@ -129,15 +124,9 @@ export const TestSession: React.FC = () => {
     const nextIdx = currentSectionIdx + 1;
     if (nextIdx < (bundle.sections || []).length) {
       setCurrentSectionIdx(nextIdx);
+      setActiveQuestionIdx(0);
       setSectionStartedAt(new Date().toISOString());
       setIsIntermission(false);
-
-      // Compute first question index of next section
-      let accum = 0;
-      for (let i = 0; i < nextIdx; i++) {
-        accum += (bundle.sections[i]?.questions || []).length;
-      }
-      setActiveQuestionIdx(accum);
     } else {
       handleFinalSubmit();
     }
@@ -179,7 +168,7 @@ export const TestSession: React.FC = () => {
             </span>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-white">2-Minute Scheduled Intermission</h2>
             <p className="text-slate-400 text-sm max-w-md mx-auto leading-relaxed">
-              Take a short rest. Rest your eyes and stretch before beginning the next section.
+              Take a short rest. Rest your eyes and stretch before beginning Section {currentSectionIdx + 2}.
             </p>
           </div>
 
@@ -213,28 +202,30 @@ export const TestSession: React.FC = () => {
               onClick={startNextSection}
               className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold text-base rounded-2xl transition-all shadow-xl hover:shadow-blue-600/25 flex items-center justify-center space-x-2 active:scale-[0.99]"
             >
-              <span>Start Next Section Now</span>
+              <span>Start Section {currentSectionIdx + 2} Now</span>
               <ChevronRight className="w-5 h-5" />
             </button>
-            <p className="text-xs text-slate-500">The next section will automatically begin when the break timer reaches 00:00.</p>
+            <p className="text-xs text-slate-500">Section {currentSectionIdx + 2} will automatically begin when the break timer reaches 00:00.</p>
           </div>
         </div>
       </div>
     );
   }
 
-  // Compile all test questions in sequence across sections
-  const allQuestions: Question[] = [];
+  // Active Section & Section-SOLEY Questions List
+  const activeSection = (bundle.sections || [])[currentSectionIdx] || (bundle.sections || [])[0];
+  const sectionQuestions: Question[] = (activeSection?.questions || []).map((q) => ({
+    ...q,
+    passage: (activeSection?.passages || []).find((p) => p.id === q.passage_id),
+  }));
+
+  // Compile total test questions for final submit modal stats
+  const totalTestQuestions: Question[] = [];
   (bundle.sections || []).forEach((s) => {
-    (s.questions || []).forEach((q) => {
-      allQuestions.push({
-        ...q,
-        passage: (s.passages || []).find((p) => p.id === q.passage_id),
-      });
-    });
+    (s.questions || []).forEach((q) => totalTestQuestions.push(q));
   });
 
-  if (allQuestions.length === 0) {
+  if (sectionQuestions.length === 0) {
     return (
       <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center p-6">
         <div className="max-w-md w-full bg-slate-800 border border-slate-700 rounded-3xl p-8 text-center space-y-5 shadow-2xl">
@@ -242,23 +233,29 @@ export const TestSession: React.FC = () => {
             <AlertTriangle className="w-8 h-8" />
           </div>
           <div className="space-y-2">
-            <h2 className="text-xl font-bold text-white">No Questions in Test</h2>
+            <h2 className="text-xl font-bold text-white">No Questions in Section {currentSectionIdx + 1}</h2>
             <p className="text-slate-400 text-sm leading-relaxed">
-              This assessment currently contains no active questions. Please contact your test administrator to add questions.
+              This section contains no active questions.
             </p>
           </div>
           <button
-            onClick={() => navigate('/test/join')}
+            onClick={() => {
+              if (currentSectionIdx < (bundle.sections || []).length - 1) {
+                startNextSection();
+              } else {
+                handleFinalSubmit();
+              }
+            }}
             className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm transition-all shadow-lg"
           >
-            Return to Test Join Page
+            {currentSectionIdx < (bundle.sections || []).length - 1 ? 'Proceed to Next Section' : 'Submit Exam'}
           </button>
         </div>
       </div>
     );
   }
 
-  const currentQ = allQuestions[activeQuestionIdx] || allQuestions[0];
+  const currentQ = sectionQuestions[activeQuestionIdx] || sectionQuestions[0];
   const currentAnswer = answersMap[currentQ?.id] || {
     id: '',
     attempt_id: attempt.id,
@@ -308,12 +305,11 @@ export const TestSession: React.FC = () => {
     }
   };
 
-  const answeredCount = Object.values(answersMap).filter(
+  const totalAnsweredCount = Object.values(answersMap).filter(
     (a) => (a.selected_option_ids && a.selected_option_ids.length > 0) || (a.text_answer && a.text_answer.trim() !== '')
   ).length;
 
-  const markedCount = Object.values(answersMap).filter((a) => a.is_marked_for_review).length;
-  const activeSectionObj = (bundle.sections || [])[currentSectionIdx];
+  const totalMarkedCount = Object.values(answersMap).filter((a) => a.is_marked_for_review).length;
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans select-none">
@@ -334,8 +330,8 @@ export const TestSession: React.FC = () => {
                 {bundle.test.title}
               </h1>
               <div className="flex items-center space-x-2 text-xs text-slate-400">
-                <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 font-bold">
-                  Section {currentSectionIdx + 1} of {(bundle.sections || []).length}: {activeSectionObj?.title || `Section ${currentSectionIdx + 1}`}
+                <span className="px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 font-bold uppercase tracking-wide">
+                  Section {currentSectionIdx + 1} of {(bundle.sections || []).length}: {activeSection?.title || `Section ${currentSectionIdx + 1}`}
                 </span>
                 <span className="hidden sm:inline">•</span>
                 <span className="hidden sm:inline">Candidate: <strong className="text-slate-200">{attempt.candidate_name}</strong></span>
@@ -366,11 +362,11 @@ export const TestSession: React.FC = () => {
           </div>
         </div>
 
-        {/* Progress Bar Line */}
+        {/* Section Question Progress Bar Line */}
         <div className="w-full bg-slate-800 h-1">
           <div
             className="bg-blue-500 h-full transition-all duration-300"
-            style={{ width: `${((activeQuestionIdx + 1) / allQuestions.length) * 100}%` }}
+            style={{ width: `${((activeQuestionIdx + 1) / sectionQuestions.length) * 100}%` }}
           />
         </div>
       </header>
@@ -561,15 +557,15 @@ export const TestSession: React.FC = () => {
             </button>
 
             <span className="text-xs font-bold text-slate-500 hidden sm:inline">
-              Question {activeQuestionIdx + 1} of {allQuestions.length}
+              Section {currentSectionIdx + 1} Question {activeQuestionIdx + 1} of {sectionQuestions.length}
             </span>
 
-            {activeQuestionIdx < allQuestions.length - 1 ? (
+            {activeQuestionIdx < sectionQuestions.length - 1 ? (
               <button
                 onClick={() => setActiveQuestionIdx(activeQuestionIdx + 1)}
                 className="px-6 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-500 flex items-center space-x-1.5 shadow-md"
               >
-                <span>Next</span>
+                <span>Next Question</span>
                 <ChevronRight className="w-4 h-4" />
               </button>
             ) : currentSectionIdx < (bundle.sections || []).length - 1 ? (
@@ -580,7 +576,7 @@ export const TestSession: React.FC = () => {
                 }}
                 className="px-6 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-500 flex items-center space-x-1.5 shadow-md"
               >
-                <span>Finish Section & Take Break</span>
+                <span>Finish Section {currentSectionIdx + 1} & Start 2-Min Break</span>
                 <ChevronRight className="w-4 h-4" />
               </button>
             ) : (
@@ -595,12 +591,20 @@ export const TestSession: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Sidebar: Question Palette Grid (Desktop) */}
+        {/* Right Sidebar: Section Question Palette Grid (Desktop) */}
         <div className={`md:block ${showPalette ? 'block' : 'hidden'} space-y-6`}>
           <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-5">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="font-bold text-sm text-slate-900">Question Palette</h3>
-              <span className="text-xs font-semibold text-slate-500">{answeredCount}/{allQuestions.length} Answered</span>
+              <div>
+                <h3 className="font-bold text-sm text-slate-900">Section {currentSectionIdx + 1} Palette</h3>
+                <p className="text-[11px] text-slate-400">{activeSection?.title}</p>
+              </div>
+              <span className="text-xs font-semibold text-slate-500">
+                {sectionQuestions.filter((q) => {
+                  const a = answersMap[q.id];
+                  return (a?.selected_option_ids && a.selected_option_ids.length > 0) || (a?.text_answer && a.text_answer.trim() !== '');
+                }).length}/{sectionQuestions.length} Answered
+              </span>
             </div>
 
             {/* Legend */}
@@ -623,9 +627,9 @@ export const TestSession: React.FC = () => {
               </div>
             </div>
 
-            {/* Question Buttons Grid */}
+            {/* Section Questions Buttons Grid ONLY */}
             <div className="grid grid-cols-5 gap-2 pt-2">
-              {allQuestions.map((q, idx) => {
+              {sectionQuestions.map((q, idx) => {
                 const ans = answersMap[q.id];
                 const isAnswered = (ans?.selected_option_ids && ans.selected_option_ids.length > 0) || (ans?.text_answer && ans.text_answer.trim() !== '');
                 const isMarked = ans?.is_marked_for_review;
@@ -667,17 +671,17 @@ export const TestSession: React.FC = () => {
             </div>
 
             <div className="space-y-2">
-              <h3 className="text-xl font-bold text-slate-900">Submit Assessment?</h3>
+              <h3 className="text-xl font-bold text-slate-900">Submit Entire Assessment?</h3>
               <p className="text-xs text-slate-500">
-                You have answered <strong>{answeredCount}</strong> of <strong>{allQuestions.length}</strong> questions.
-                {markedCount > 0 && ` (${markedCount} marked for review)`}
+                You have answered <strong>{totalAnsweredCount}</strong> of <strong>{totalTestQuestions.length}</strong> questions across all sections.
+                {totalMarkedCount > 0 && ` (${totalMarkedCount} marked for review)`}
               </p>
             </div>
 
             <div className="bg-slate-50 p-4 rounded-2xl text-xs text-slate-600 text-left space-y-1">
-              <div>• Answered: <strong>{answeredCount}</strong></div>
-              <div>• Unanswered: <strong>{allQuestions.length - answeredCount}</strong></div>
-              <div>• Marked for review: <strong>{markedCount}</strong></div>
+              <div>• Total Answered: <strong>{totalAnsweredCount}</strong></div>
+              <div>• Unanswered: <strong>{totalTestQuestions.length - totalAnsweredCount}</strong></div>
+              <div>• Marked for review: <strong>{totalMarkedCount}</strong></div>
             </div>
 
             <div className="flex space-x-3">
