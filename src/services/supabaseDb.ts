@@ -14,9 +14,20 @@ import {
 import { generateAccessCode } from './timer';
 import { calculateAttemptScore } from './scoring';
 
+function generateUuid(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 /**
  * Direct Supabase PostgreSQL Database Integration
- * Persists all created, edited, and published tests, attempts, answers, event logs, and options directly to Supabase PostgreSQL database tables.
+ * Persists all created, edited, and published tests, attempts, answers, event logs, and options directly to Supabase PostgreSQL database tables using valid UUID models.
  */
 export const supabaseDb = {
   /**
@@ -120,35 +131,47 @@ export const supabaseDb = {
   },
 
   /**
-   * Save / Upsert full test bundle into Supabase PostgreSQL database
+   * Save / Upsert full test bundle into Supabase PostgreSQL database (with defensive fallback)
    */
   async saveTestBundle(bundle: TestFullDetails): Promise<TestFullDetails> {
     const client = getSupabaseClient();
     const { test, sections } = bundle;
 
     // 1. Upsert Test row
-    const { error: testErr } = await client.from('tests').upsert({
+    const testRow: any = {
       id: test.id,
       title: test.title,
-      description: test.description,
-      instructions: test.instructions,
-      duration_minutes: test.duration_minutes,
-      status: test.status,
-      access_code: test.access_code || generateAccessCode(),
-      code_expires_at: test.code_expires_at || null,
-      code_max_uses: test.code_max_uses !== undefined ? test.code_max_uses : null,
-      code_current_uses: test.code_current_uses || 0,
-      is_code_active: test.is_code_active !== false,
-      max_attempts: test.max_attempts,
-      result_visibility: test.result_visibility,
-      randomize_questions: test.randomize_questions,
-      randomize_options: test.randomize_options,
+      description: test.description || '',
+      instructions: test.instructions || '',
+      duration_minutes: test.duration_minutes || 30,
+      status: test.status || 'PUBLISHED',
+      access_code: (test.access_code || generateAccessCode()).substring(0, 10),
+      max_attempts: test.max_attempts || 1,
+      result_visibility: test.result_visibility || 'AFTER_SUBMISSION',
+      randomize_questions: !!test.randomize_questions,
+      randomize_options: !!test.randomize_options,
       updated_at: new Date().toISOString(),
-    });
+    };
+
+    if (test.code_expires_at) testRow.code_expires_at = test.code_expires_at;
+    if (test.code_max_uses !== undefined) testRow.code_max_uses = test.code_max_uses;
+    if (test.code_current_uses !== undefined) testRow.code_current_uses = test.code_current_uses;
+    if (test.is_code_active !== undefined) testRow.is_code_active = test.is_code_active;
+
+    let { error: testErr } = await client.from('tests').upsert(testRow);
 
     if (testErr) {
-      console.error('Error saving test to Supabase:', testErr);
-      throw new Error(`Failed to save test details: ${testErr.message}`);
+      console.warn('Primary test upsert notice:', testErr.message);
+      // Fallback for older database schemas
+      delete testRow.is_code_active;
+      delete testRow.code_expires_at;
+      delete testRow.code_max_uses;
+      delete testRow.code_current_uses;
+      testRow.access_code = (testRow.access_code || 'CODE123').substring(0, 8);
+      const fallbackRes = await client.from('tests').upsert(testRow);
+      if (fallbackRes.error) {
+        throw new Error(`Failed to save test details: ${fallbackRes.error.message}`);
+      }
     }
 
     // 2. Upsert Sections, Passages, Questions, Options
@@ -157,8 +180,8 @@ export const supabaseDb = {
         id: sec.id,
         test_id: test.id,
         title: sec.title,
-        description: sec.description,
-        position: sec.position,
+        description: sec.description || '',
+        position: sec.position || 1,
       });
       if (secErr) throw new Error(`Failed to save section "${sec.title}": ${secErr.message}`);
 
@@ -168,7 +191,7 @@ export const supabaseDb = {
           section_id: sec.id,
           title: pas.title,
           content: pas.content,
-          position: pas.position,
+          position: pas.position || 1,
         });
         if (pasErr) console.warn('Passage save warning:', pasErr);
       }
@@ -202,7 +225,7 @@ export const supabaseDb = {
           numeric_tolerance: q.numeric_tolerance || 0,
           explanation: q.explanation || null,
           points: q.points || 1.0,
-          position: q.position,
+          position: q.position || 1,
         });
         if (qErr) throw new Error(`Failed to save question: ${qErr.message}`);
 
@@ -212,9 +235,9 @@ export const supabaseDb = {
           await client.from('options').insert({
             id: opt.id,
             question_id: q.id,
-            option_text: opt.option_text,
-            is_correct: opt.is_correct,
-            position: opt.position,
+            option_text: opt.option_text || '',
+            is_correct: !!opt.is_correct,
+            position: opt.position || 1,
           });
         }
       }
@@ -304,11 +327,11 @@ export const supabaseDb = {
   },
 
   /**
-   * Start a candidate test attempt in Supabase
+   * Start a candidate test attempt in Supabase using valid UUID
    */
   async startAttempt(testId: string, candidateName: string, candidateEmail?: string): Promise<Attempt> {
     const client = getSupabaseClient();
-    const attemptId = `att-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+    const attemptId = generateUuid();
     const now = new Date().toISOString();
 
     const { data: testData } = await client.from('tests').select('duration_minutes').eq('id', testId).single();
@@ -377,7 +400,7 @@ export const supabaseDb = {
   },
 
   /**
-   * Save / Autosave an answer row directly to Supabase answers table
+   * Save / Autosave an answer row directly to Supabase answers table using valid UUID
    */
   async saveAnswer(
     attemptId: string,
@@ -385,7 +408,7 @@ export const supabaseDb = {
     payload: { selectedOptionIds?: string[]; textAnswer?: string; isMarkedForReview?: boolean }
   ): Promise<Answer> {
     const client = getSupabaseClient();
-    const answerId = `ans-${attemptId}-${questionId}`;
+    const answerId = generateUuid();
     const now = new Date().toISOString();
 
     const ansRow = {
@@ -400,7 +423,7 @@ export const supabaseDb = {
     };
 
     try {
-      await client.from('answers').upsert(ansRow);
+      await client.from('answers').upsert(ansRow, { onConflict: 'attempt_id,question_id' });
     } catch (e) {
       console.warn('Supabase saveAnswer notice:', e);
     }
@@ -460,7 +483,7 @@ export const supabaseDb = {
    */
   async logEvent(attemptId: string, eventType: string, payload: Record<string, any>): Promise<EventLog> {
     const client = getSupabaseClient();
-    const eventId = `evt-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    const eventId = generateUuid();
     const now = new Date().toISOString();
     const logItem: EventLog = {
       id: eventId,

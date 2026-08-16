@@ -33,6 +33,17 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 
+function generateUuid(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export const TestEditor: React.FC = () => {
   const { testId } = useParams<{ testId?: string }>();
   const navigate = useNavigate();
@@ -45,7 +56,7 @@ export const TestEditor: React.FC = () => {
   const [activeSectionIdx, setActiveSectionIdx] = useState<number>(0);
 
   const fallbackSec: Section & { questions: Question[]; passages: Passage[] } = {
-    id: `sec-${Date.now()}-1`,
+    id: generateUuid(),
     test_id: bundle?.test?.id || 'new',
     title: 'Section 1: General Assessment',
     description: '',
@@ -119,7 +130,7 @@ export const TestEditor: React.FC = () => {
           }
         } else {
           // Create new draft test default template
-          const newId = `test-${Date.now()}`;
+          const newId = generateUuid();
           const newBundle: TestFullDetails = {
             test: {
               id: newId,
@@ -139,7 +150,7 @@ export const TestEditor: React.FC = () => {
             },
             sections: [
               {
-                id: `sec-${Date.now()}-1`,
+                id: generateUuid(),
                 test_id: newId,
                 title: 'Section 1: General Assessment',
                 description: 'Primary assessment section',
@@ -207,7 +218,7 @@ export const TestEditor: React.FC = () => {
 
   const handleAddSection = () => {
     const newSec: Section & { questions: Question[]; passages: Passage[] } = {
-      id: `sec-${Date.now()}-${bundle.sections.length + 1}`,
+      id: generateUuid(),
       test_id: bundle.test.id,
       title: `Section ${bundle.sections.length + 1}`,
       description: '',
@@ -307,7 +318,7 @@ export const TestEditor: React.FC = () => {
   const handleSavePassage = () => {
     if (!passageContent.trim()) return;
     const newPassage: Passage = {
-      id: `pass-${Date.now()}`,
+      id: generateUuid(),
       section_id: activeSection.id,
       title: passageTitle || `Passage ${activeSection.passages.length + 1}`,
       content: passageContent,

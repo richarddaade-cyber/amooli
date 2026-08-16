@@ -20,6 +20,17 @@ interface QuestionBuilderProps {
   onCancel: () => void;
 }
 
+function generateUuid(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
   question = {},
   passages = [],
@@ -191,7 +202,7 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
       .filter((val) => !isNaN(val));
 
     const compiledQuestion: Question = {
-      id: question.id || `q-${Date.now()}`,
+      id: question.id || generateUuid(),
       section_id: question.section_id || '',
       passage_id: passageId || undefined,
       question_type: questionType,
@@ -213,7 +224,7 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
       created_at: question.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString(),
       options: questionType === 'NUMERIC_ENTRY' ? [] : options.map((opt, idx) => ({
-        id: opt.id || `opt-${Date.now()}-${idx}`,
+        id: opt.id || generateUuid(),
         question_id: question.id || '',
         option_text: opt.option_text || '',
         image_url: opt.image_url,
