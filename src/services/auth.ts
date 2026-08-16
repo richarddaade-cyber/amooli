@@ -19,6 +19,17 @@ export interface AdminUser {
   loggedInAt: string;
 }
 
+function generateUuid(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 function getStoredAdminAccounts(): AdminAccount[] {
   try {
     const raw = localStorage.getItem(ADMIN_ACCOUNTS_KEY);
@@ -36,7 +47,7 @@ function saveStoredAdminAccounts(accounts: AdminAccount[]): void {
 
 export const authService = {
   /**
-   * Async Login — Authenticates against Official Supabase Auth & Supabase PostgreSQL admin_users table
+   * Async Login — Authenticates against Official Supabase Auth, Supabase PostgreSQL admin_users table, & Local accounts
    */
   async login(email: string, pass: string): Promise<{ success: boolean; error?: string; user?: AdminUser }> {
     const cleanEmail = email.trim().toLowerCase();
@@ -48,7 +59,7 @@ export const authService = {
       return { success: false, error: 'Please provide both email/username and password.' };
     }
 
-    // 1. First Try Official Supabase Auth (Supabase Dashboard -> Authentication tab)
+    // 1. Try Official Supabase Auth
     try {
       const { data: authData, error: authErr } = await client.auth.signInWithPassword({
         email: fullEmail,
@@ -67,20 +78,29 @@ export const authService = {
       }
     } catch (authException) {}
 
-    // 2. Check Supabase PostgreSQL admin_users table (Table Editor)
+    // 2. Check Supabase PostgreSQL admin_users table
     try {
-      const { data } = await client
+      const { data, error } = await client
         .from('admin_users')
         .select('*');
 
+      if (error) {
+        console.warn('Supabase admin_users select notice:', error);
+      }
+
       if (data && data.length > 0) {
-        const found = data.find(
-          (u) =>
-            (u.email.toLowerCase() === cleanEmail ||
-              u.email.toLowerCase().startsWith(cleanEmail + '@') ||
-              cleanEmail.startsWith(u.email.toLowerCase().split('@')[0])) &&
-            u.password_hash.trim() === cleanPass
-        );
+        const found = data.find((u) => {
+          const uEmail = (u.email || '').toLowerCase().trim();
+          const uName = (u.name || '').toLowerCase().trim();
+          const emailMatch =
+            uEmail === cleanEmail ||
+            uEmail === fullEmail ||
+            uEmail.startsWith(cleanEmail + '@') ||
+            cleanEmail.startsWith(uEmail.split('@')[0]);
+          const nameMatch = uName === cleanEmail;
+          const passMatch = (u.password_hash || '').trim() === cleanPass;
+          return (emailMatch || nameMatch) && passMatch;
+        });
 
         if (found) {
           const user: AdminUser = {
@@ -90,18 +110,6 @@ export const authService = {
             loggedInAt: new Date().toISOString(),
           };
           localStorage.setItem(ADMIN_AUTH_KEY, JSON.stringify(user));
-
-          // Also sync to Supabase Auth if missing
-          (async () => {
-            try {
-              await client.auth.signUp({
-                email: found.email,
-                password: cleanPass,
-                options: { data: { full_name: found.name } },
-              });
-            } catch (e) {}
-          })();
-
           return { success: true, user };
         }
       }
@@ -111,11 +119,16 @@ export const authService = {
 
     // 3. Check Local Accounts store
     const localAccounts = getStoredAdminAccounts();
-    const match = localAccounts.find(
-      (a) =>
-        (a.email.toLowerCase() === cleanEmail || a.email.toLowerCase().startsWith(cleanEmail + '@')) &&
-        a.password_hash.trim() === cleanPass
-    );
+    const match = localAccounts.find((a) => {
+      const aEmail = (a.email || '').toLowerCase().trim();
+      const emailMatch =
+        aEmail === cleanEmail ||
+        aEmail === fullEmail ||
+        aEmail.startsWith(cleanEmail + '@') ||
+        cleanEmail.startsWith(aEmail.split('@')[0]);
+      const passMatch = (a.password_hash || '').trim() === cleanPass;
+      return emailMatch && passMatch;
+    });
 
     if (match) {
       const user: AdminUser = {
@@ -125,18 +138,6 @@ export const authService = {
         loggedInAt: new Date().toISOString(),
       };
       localStorage.setItem(ADMIN_AUTH_KEY, JSON.stringify(user));
-
-      // Sync to Supabase Auth
-      (async () => {
-        try {
-          await client.auth.signUp({
-            email: match.email,
-            password: cleanPass,
-            options: { data: { full_name: match.name } },
-          });
-        } catch (e) {}
-      })();
-
       return { success: true, user };
     }
 
@@ -152,7 +153,6 @@ export const authService = {
         loggedInAt: new Date().toISOString(),
       };
 
-      // Auto provision in Supabase Auth and Database
       (async () => {
         try {
           await client.auth.signUp({
@@ -163,13 +163,17 @@ export const authService = {
         } catch (e) {}
 
         try {
-          await client.from('admin_users').upsert({
-            email: 'superadmin@preppulse.com',
-            password_hash: 'SuperAdminPass123!',
-            name: 'Super Administrator',
-            role: 'ADMINISTRATOR',
-            updated_at: new Date().toISOString(),
-          });
+          await client.from('admin_users').upsert(
+            {
+              id: generateUuid(),
+              email: 'superadmin@preppulse.com',
+              password_hash: 'SuperAdminPass123!',
+              name: 'Super Administrator',
+              role: 'ADMINISTRATOR',
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'email' }
+          );
         } catch (e) {}
       })();
 
@@ -230,7 +234,7 @@ export const authService = {
   },
 
   /**
-   * Create a new Admin Account — Registers in official Supabase Auth AND public.admin_users table
+   * Create a new Admin Account — Registers in valid UUID format for PostgreSQL admin_users table & Supabase Auth
    */
   async createAdminAccount(name: string, email: string, password: string): Promise<AdminAccount> {
     const client = getSupabaseClient();
@@ -239,7 +243,7 @@ export const authService = {
     const cleanPass = password.trim();
 
     const newAcc: AdminAccount = {
-      id: `admin-${Date.now()}`,
+      id: generateUuid(),
       email: fullEmail,
       name: name.trim(),
       password_hash: cleanPass,
@@ -247,11 +251,34 @@ export const authService = {
       created_at: new Date().toISOString(),
     };
 
+    // Save to local accounts
     const local = getStoredAdminAccounts();
     local.push(newAcc);
     saveStoredAdminAccounts(local);
 
-    // 1. Register in Official Supabase Auth (So user appears under Supabase Dashboard -> Authentication tab)
+    // 1. Save to public.admin_users table (valid UUID format)
+    try {
+      const { error: dbErr } = await client.from('admin_users').upsert(
+        {
+          id: newAcc.id,
+          email: newAcc.email,
+          name: newAcc.name,
+          password_hash: newAcc.password_hash,
+          role: 'ADMINISTRATOR',
+          created_at: newAcc.created_at,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'email' }
+      );
+
+      if (dbErr) {
+        console.error('Supabase admin_users table insert error:', dbErr.message);
+      }
+    } catch (err) {
+      console.warn('Supabase admin_users table insert exception:', err);
+    }
+
+    // 2. Register in Official Supabase Auth
     try {
       await client.auth.signUp({
         email: fullEmail,
@@ -262,21 +289,6 @@ export const authService = {
       });
     } catch (err) {
       console.warn('Supabase auth.signUp notice:', err);
-    }
-
-    // 2. Also save to public.admin_users table (Table Editor)
-    try {
-      await client.from('admin_users').upsert({
-        id: newAcc.id,
-        email: newAcc.email,
-        name: newAcc.name,
-        password_hash: newAcc.password_hash,
-        role: 'ADMINISTRATOR',
-        created_at: newAcc.created_at,
-        updated_at: new Date().toISOString(),
-      });
-    } catch (err) {
-      console.warn('Supabase admin_users table insert notice:', err);
     }
 
     return newAcc;
@@ -299,7 +311,10 @@ export const authService = {
     }
 
     try {
-      await client.from('admin_users').update({ password_hash: cleanPass }).eq('email', fullEmail);
+      await client
+        .from('admin_users')
+        .update({ password_hash: cleanPass, updated_at: new Date().toISOString() })
+        .eq('email', fullEmail);
     } catch (err) {}
 
     return true;
