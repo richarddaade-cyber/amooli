@@ -13,8 +13,10 @@ import {
   BookOpen,
   Menu,
   FileCheck,
+  Calculator,
 } from 'lucide-react';
 import { filterValidImages } from '../../components/admin/QuestionBuilder';
+import { GreCalculator } from '../../components/taker/GreCalculator';
 
 export const TestSession: React.FC = () => {
   const { attemptId } = useParams<{ attemptId: string }>();
@@ -27,6 +29,9 @@ export const TestSession: React.FC = () => {
   // Active section tracking & section-scoped question index
   const [currentSectionIdx, setCurrentSectionIdx] = useState(0);
   const [activeQuestionIdx, setActiveQuestionIdx] = useState(0);
+
+  // Calculator toggle state
+  const [showCalculator, setShowCalculator] = useState(false);
 
   // Section-level timing & intermission break states
   const [sectionStartedAt, setSectionStartedAt] = useState<string>('');
@@ -340,8 +345,21 @@ export const TestSession: React.FC = () => {
             </div>
           </div>
 
-          {/* Countdown Timer Badge & Actions */}
+          {/* Countdown Timer Badge, Calculator & Actions */}
           <div className="flex items-center space-x-3">
+            <button
+              onClick={() => setShowCalculator(!showCalculator)}
+              className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center space-x-1.5 shadow-sm active:scale-95 ${
+                showCalculator
+                  ? 'bg-emerald-600 border-emerald-500 text-white shadow-emerald-600/30'
+                  : 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700'
+              }`}
+              title="Toggle On-Screen GRE Calculator"
+            >
+              <Calculator className="w-4 h-4 text-emerald-400" />
+              <span className="hidden sm:inline">Calculator</span>
+            </button>
+
             {timer && (
               <div className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-xl border font-mono font-bold text-sm sm:text-base transition-colors ${
                 timer.remainingSeconds < 300
@@ -495,14 +513,24 @@ export const TestSession: React.FC = () => {
 
                 {/* Numeric Entry Input */}
                 {currentQ.question_type === 'NUMERIC_ENTRY' && (
-                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 space-y-2 max-w-md">
-                    <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Your Numeric Answer</label>
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 space-y-3 max-w-md">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Your Numeric Answer</label>
+                      <button
+                        type="button"
+                        onClick={() => setShowCalculator(true)}
+                        className="text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg flex items-center space-x-1 transition-colors"
+                      >
+                        <Calculator className="w-3.5 h-3.5" />
+                        <span>Use GRE Calculator</span>
+                      </button>
+                    </div>
                     <input
                       type="number"
                       step="any"
                       value={currentAnswer.text_answer || ''}
                       onChange={(e) => handleAnswerChange({ textAnswer: e.target.value })}
-                      placeholder="Type number..."
+                      placeholder="Type or transfer numeric answer..."
                       className="w-full p-3.5 border border-slate-300 rounded-xl text-lg font-mono font-bold bg-white text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none"
                     />
                   </div>
@@ -702,6 +730,20 @@ export const TestSession: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* On-Screen Draggable GRE Calculator */}
+      <GreCalculator
+        isOpen={showCalculator}
+        onClose={() => setShowCalculator(false)}
+        onTransferDisplay={(val) => {
+          if (currentQ && currentQ.question_type === 'NUMERIC_ENTRY') {
+            handleAnswerChange({ textAnswer: val });
+          } else {
+            navigator.clipboard.writeText(val);
+            alert(`Calculator value "${val}" copied to clipboard!`);
+          }
+        }}
+      />
     </div>
   );
 };
