@@ -209,22 +209,39 @@ export const supabaseDb = {
       }
 
       for (const q of sec.questions || []) {
-        const { error: qErr } = await client.from('questions').upsert({
+        const qRow: any = {
           id: q.id,
           section_id: sec.id,
           passage_id: q.passage_id || null,
           question_type: q.question_type,
           prompt: q.prompt,
           image_url: q.image_url || null,
-          image_urls: q.image_urls || null,
           quantity_a: q.quantity_a || null,
           quantity_b: q.quantity_b || null,
-          numeric_answer: q.numeric_answer !== undefined ? q.numeric_answer : null,
+          numeric_answer: q.numeric_answer !== undefined && (q.numeric_answer as any) !== '' && q.numeric_answer !== null ? Number(q.numeric_answer) : null,
           numeric_tolerance: q.numeric_tolerance || 0,
           explanation: q.explanation || null,
           points: q.points || 1.0,
           position: q.position || 1,
-        });
+        };
+
+        if (q.image_urls && q.image_urls.length > 0) qRow.image_urls = q.image_urls;
+        if (q.quantity_a_image) qRow.quantity_a_image = q.quantity_a_image;
+        if (q.quantity_a_images && q.quantity_a_images.length > 0) qRow.quantity_a_images = q.quantity_a_images;
+        if (q.quantity_b_image) qRow.quantity_b_image = q.quantity_b_image;
+        if (q.quantity_b_images && q.quantity_b_images.length > 0) qRow.quantity_b_images = q.quantity_b_images;
+
+        let { error: qErr } = await client.from('questions').upsert(qRow);
+        if (qErr && qErr.code === 'PGRST204') {
+          delete qRow.image_urls;
+          delete qRow.quantity_a_image;
+          delete qRow.quantity_a_images;
+          delete qRow.quantity_b_image;
+          delete qRow.quantity_b_images;
+          const fallbackRes = await client.from('questions').upsert(qRow);
+          qErr = fallbackRes.error;
+        }
+
         if (qErr) throw new Error(`Failed to save question: ${qErr.message}`);
 
         // Sync options
