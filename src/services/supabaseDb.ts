@@ -37,7 +37,7 @@ export const supabaseDb = {
     const client = getSupabaseClient();
     const { data: tests, error } = await client
       .from('tests')
-      .select('*, sections(count), attempts(count)')
+      .select('*, sections(id, questions(count)), attempts(count)')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -45,12 +45,24 @@ export const supabaseDb = {
       return [];
     }
 
-    return (tests || []).map((t: any) => ({
-      ...t,
-      sections_count: t.sections ? t.sections[0]?.count || 0 : 0,
-      questions_count: 0,
-      active_candidates_count: t.attempts ? t.attempts[0]?.count || 0 : 0,
-    }));
+    return (tests || []).map((t: any) => {
+      let totalQuestions = 0;
+      const totalSections = t.sections ? t.sections.length : 0;
+      if (t.sections) {
+        t.sections.forEach((sec: any) => {
+          if (sec.questions && sec.questions[0]) {
+            totalQuestions += sec.questions[0].count || 0;
+          }
+        });
+      }
+
+      return {
+        ...t,
+        sections_count: totalSections,
+        questions_count: totalQuestions,
+        active_candidates_count: t.attempts ? t.attempts[0]?.count || 0 : 0,
+      };
+    });
   },
 
   /**
