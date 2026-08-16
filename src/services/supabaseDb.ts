@@ -248,7 +248,7 @@ export const supabaseDb = {
         await client.from('options').delete().eq('question_id', q.id);
         for (const opt of q.options || []) {
           await client.from('options').insert({
-            id: opt.id,
+            id: opt.id && opt.id !== '' ? opt.id : generateUuid(),
             question_id: q.id,
             option_text: opt.option_text || '',
             is_correct: !!opt.is_correct,

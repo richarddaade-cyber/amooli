@@ -201,8 +201,10 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
       .map((val) => parseFloat(String(val).trim()))
       .filter((val) => !isNaN(val));
 
+    const qId = question.id || generateUuid();
+
     const compiledQuestion: Question = {
-      id: question.id || generateUuid(),
+      id: qId,
       section_id: question.section_id || '',
       passage_id: passageId || undefined,
       question_type: questionType,
@@ -225,7 +227,7 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
       updated_at: new Date().toISOString(),
       options: questionType === 'NUMERIC_ENTRY' ? [] : options.map((opt, idx) => ({
         id: opt.id || generateUuid(),
-        question_id: question.id || '',
+        question_id: qId,
         option_text: opt.option_text || '',
         image_url: opt.image_url,
         is_correct: !!opt.is_correct,
