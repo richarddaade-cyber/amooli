@@ -141,10 +141,41 @@ export const authService = {
       return { success: true, user };
     }
 
-    // 4. Master Emergency Provisioning Fallback (Auto-registers Super Admin in Supabase Auth & DB)
+    // 4. Master Emergency Provisioning Fallbacks
+    if (
+      (cleanEmail === 'amooli@preppulse.com' || cleanEmail === 'amooli') &&
+      (cleanPass === 'Amooli1234' || cleanPass === 'amooli1234')
+    ) {
+      const amooliUser: AdminUser = {
+        email: 'amooli@preppulse.com',
+        name: 'Super Administrator',
+        role: 'ADMINISTRATOR',
+        loggedInAt: new Date().toISOString(),
+      };
+
+      (async () => {
+        try {
+          await client.from('admin_users').upsert(
+            {
+              id: generateUuid(),
+              email: 'amooli@preppulse.com',
+              password_hash: 'Amooli1234',
+              name: 'Super Administrator',
+              role: 'ADMINISTRATOR',
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'email' }
+          );
+        } catch (e) {}
+      })();
+
+      localStorage.setItem(ADMIN_AUTH_KEY, JSON.stringify(amooliUser));
+      return { success: true, user: amooliUser };
+    }
+
     if (
       (cleanEmail === 'superadmin@preppulse.com' || cleanEmail === 'superadmin') &&
-      cleanPass === 'SuperAdminPass123!'
+      (cleanPass === 'SuperAdminPass123!' || cleanPass === 'superadminpass123!')
     ) {
       const superUser: AdminUser = {
         email: 'superadmin@preppulse.com',
