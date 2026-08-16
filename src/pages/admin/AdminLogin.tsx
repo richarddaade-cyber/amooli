@@ -35,11 +35,6 @@ export const AdminLogin: React.FC = () => {
     }
   };
 
-  const handleFillDemo = () => {
-    setEmail('admin@preppulse.com');
-    setPassword('admin123');
-  };
-
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8 selection:bg-blue-500 selection:text-white">
       {/* Top Navbar Header */}
@@ -77,20 +72,6 @@ export const AdminLogin: React.FC = () => {
               <span>{error}</span>
             </div>
           )}
-
-          {/* Quick Demo Hint Banner */}
-          <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-4 flex items-center justify-between text-xs text-blue-300">
-            <div>
-              <div>Demo Admin Email: <strong className="text-white font-mono">admin@preppulse.com</strong></div>
-              <div>Password: <strong className="text-white font-mono">admin123</strong></div>
-            </div>
-            <button
-              onClick={handleFillDemo}
-              className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] shadow-sm transition-colors whitespace-nowrap"
-            >
-              Auto-Fill
-            </button>
-          </div>
 
           <form onSubmit={handleLogin} className="space-y-5">
             {/* Email Input */}

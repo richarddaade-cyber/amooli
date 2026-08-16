@@ -19,27 +19,15 @@ export interface AdminUser {
   loggedInAt: string;
 }
 
-const DEFAULT_ADMINS: AdminAccount[] = [
-  {
-    id: 'admin-master',
-    email: 'admin@preppulse.com',
-    name: 'Lead Test Administrator',
-    password_hash: 'admin123',
-    role: 'ADMINISTRATOR',
-    created_at: new Date().toISOString(),
-  },
-];
+const DEFAULT_ADMINS: AdminAccount[] = [];
 
 function getStoredAdminAccounts(): AdminAccount[] {
   try {
     const raw = localStorage.getItem(ADMIN_ACCOUNTS_KEY);
-    if (!raw) {
-      localStorage.setItem(ADMIN_ACCOUNTS_KEY, JSON.stringify(DEFAULT_ADMINS));
-      return DEFAULT_ADMINS;
-    }
+    if (!raw) return [];
     return JSON.parse(raw);
   } catch (e) {
-    return DEFAULT_ADMINS;
+    return [];
   }
 }
 
@@ -51,7 +39,7 @@ function saveStoredAdminAccounts(accounts: AdminAccount[]): void {
 
 export const authService = {
   /**
-   * Async Login — Queries Supabase PostgreSQL admin_users table first, then falls back to local accounts
+   * Async Login — Strictly authenticates against Supabase PostgreSQL admin_users table & registered accounts
    */
   async login(email: string, pass: string): Promise<{ success: boolean; error?: string; user?: AdminUser }> {
     const cleanEmail = email.trim().toLowerCase();
@@ -63,7 +51,7 @@ export const authService = {
 
     // 1. Check Supabase PostgreSQL admin_users table
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('admin_users')
         .select('*')
         .or(`email.eq.${cleanEmail},email.eq.${cleanEmail}@preppulse.com`)
@@ -72,7 +60,7 @@ export const authService = {
       if (data && data.password_hash === cleanPass) {
         const user: AdminUser = {
           email: data.email,
-          name: data.name || 'Test Administrator',
+          name: data.name || 'Administrator',
           role: 'ADMINISTRATOR',
           loggedInAt: new Date().toISOString(),
         };
@@ -91,10 +79,10 @@ export const authService = {
         a.password_hash === cleanPass
     );
 
-    if (match || ((cleanEmail === 'admin@preppulse.com' || cleanEmail === 'admin') && cleanPass === 'admin123')) {
+    if (match) {
       const user: AdminUser = {
-        email: match?.email || 'admin@preppulse.com',
-        name: match?.name || 'Lead Test Administrator',
+        email: match.email,
+        name: match.name,
         role: 'ADMINISTRATOR',
         loggedInAt: new Date().toISOString(),
       };
@@ -102,7 +90,7 @@ export const authService = {
       return { success: true, user };
     }
 
-    return { success: false, error: 'Invalid admin email/username or password.' };
+    return { success: false, error: 'Invalid administrator email/username or password.' };
   },
 
   /**
