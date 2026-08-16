@@ -206,6 +206,21 @@ CREATE TABLE IF NOT EXISTS admin_users (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Enable RLS and Allow Public Access Policies for Admin Authentication
+ALTER TABLE admin_users ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "Allow public select for admin auth" ON admin_users FOR SELECT USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Allow public insert for admin creation" ON admin_users FOR INSERT WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "Allow public update for admin update" ON admin_users FOR UPDATE USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 -- Seed Default Master Admin if missing (admin@preppulse.com / admin123)
 INSERT INTO admin_users (email, password_hash, name, role)
 VALUES ('admin@preppulse.com', 'admin123', 'Lead Test Administrator', 'ADMINISTRATOR')

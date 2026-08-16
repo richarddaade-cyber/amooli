@@ -51,21 +51,33 @@ export const authService = {
 
     // 1. Check Supabase PostgreSQL admin_users table
     try {
-      const { data } = await supabase
+      let { data, error } = await supabase
         .from('admin_users')
-        .select('*')
-        .or(`email.eq.${cleanEmail},email.eq.${cleanEmail}@preppulse.com`)
-        .maybeSingle();
+        .select('*');
 
-      if (data && data.password_hash === cleanPass) {
-        const user: AdminUser = {
-          email: data.email,
-          name: data.name || 'Administrator',
-          role: 'ADMINISTRATOR',
-          loggedInAt: new Date().toISOString(),
-        };
-        localStorage.setItem(ADMIN_AUTH_KEY, JSON.stringify(user));
-        return { success: true, user };
+      if (error) {
+        console.warn('Supabase admin_users select error:', error);
+      }
+
+      if (data && data.length > 0) {
+        const found = data.find(
+          (u) =>
+            (u.email.toLowerCase() === cleanEmail ||
+              u.email.toLowerCase().startsWith(cleanEmail + '@') ||
+              cleanEmail.startsWith(u.email.toLowerCase().split('@')[0])) &&
+            u.password_hash.trim() === cleanPass
+        );
+
+        if (found) {
+          const user: AdminUser = {
+            email: found.email,
+            name: found.name || 'Administrator',
+            role: 'ADMINISTRATOR',
+            loggedInAt: new Date().toISOString(),
+          };
+          localStorage.setItem(ADMIN_AUTH_KEY, JSON.stringify(user));
+          return { success: true, user };
+        }
       }
     } catch (dbErr) {
       console.warn('Supabase auth query notice:', dbErr);
