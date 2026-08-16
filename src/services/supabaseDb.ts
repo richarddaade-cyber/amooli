@@ -206,8 +206,6 @@ export const supabaseDb = {
             await client.from('questions').delete().eq('id', item.id);
           }
         }
-      } else {
-        await client.from('questions').delete().eq('section_id', sec.id);
       }
 
       for (const q of sec.questions || []) {

@@ -258,6 +258,8 @@ export const TestEditor: React.FC = () => {
     setSaveToast('Syncing question with Supabase Database...');
     try {
       await dbService.saveTestBundle(newBundle);
+      const updated = await dbService.getTestFullDetails(newBundle.test.id);
+      if (updated) setBundle(updated);
       setSaveToast('Question updated and saved to Supabase successfully!');
       setTimeout(() => setSaveToast(null), 3000);
     } catch (err: any) {
@@ -284,6 +286,8 @@ export const TestEditor: React.FC = () => {
       try {
         await dbService.deleteQuestion(qId);
         await dbService.saveTestBundle(newBundle);
+        const updated = await dbService.getTestFullDetails(newBundle.test.id);
+        if (updated) setBundle(updated);
         setSaveToast('Question deleted and test updated in Supabase!');
         setTimeout(() => setSaveToast(null), 3000);
       } catch (err: any) {
@@ -343,15 +347,23 @@ export const TestEditor: React.FC = () => {
 
   const handlePublish = async () => {
     let totalQs = 0;
-    bundle.sections.forEach((s) => (totalQs += s.questions.length));
+    bundle.sections.forEach((s) => (totalQs += (s.questions || []).length));
     if (totalQs === 0) {
       alert('Cannot publish a test with 0 questions. Please add questions first.');
       return;
     }
-    await dbService.updateTestStatus(bundle.test.id, 'PUBLISHED');
-    const updated = await dbService.getTestFullDetails(bundle.test.id);
-    if (updated) setBundle(updated);
-    alert('Test successfully published!');
+    setSaveToast('Saving test details & questions to Supabase Database...');
+    try {
+      await dbService.saveTestBundle(bundle);
+      await dbService.updateTestStatus(bundle.test.id, 'PUBLISHED');
+      const updated = await dbService.getTestFullDetails(bundle.test.id);
+      if (updated) setBundle(updated);
+      setSaveToast('Test successfully saved & published!');
+      setTimeout(() => setSaveToast(null), 3000);
+      alert('Test successfully published!');
+    } catch (err: any) {
+      alert(`Failed to publish test: ${err.message}`);
+    }
   };
 
   return (
