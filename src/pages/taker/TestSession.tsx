@@ -465,28 +465,28 @@ export const TestSession: React.FC = () => {
                       <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Quantity A</span>
                       <div className="p-4 rounded-xl bg-white border border-slate-300 text-base font-bold text-slate-900 shadow-sm space-y-3">
                         {currentQ.quantity_a && <div>{currentQ.quantity_a}</div>}
-                        {(currentQ.quantity_a_images || (currentQ.quantity_a_image ? [currentQ.quantity_a_image] : []))?.length > 0 && (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {(currentQ.quantity_a_images || [currentQ.quantity_a_image!]).map((url, idx) => (
-                              <img key={idx} src={url} alt={`Quantity A ${idx + 1}`} className="max-h-40 object-contain rounded-lg border border-slate-200 p-1 bg-slate-50" />
+                        {(currentQ.quantity_a_images?.length || currentQ.quantity_a_image) ? (
+                          <div className="grid grid-cols-1 gap-2 pt-1">
+                            {(currentQ.quantity_a_images && currentQ.quantity_a_images.length > 0 ? currentQ.quantity_a_images : [currentQ.quantity_a_image!]).map((url, idx) => (
+                              <img key={idx} src={url} alt={`Quantity A ${idx + 1}`} className="max-h-52 object-contain rounded-xl border border-slate-200 p-1.5 bg-white shadow-sm" />
                             ))}
                           </div>
-                        )}
-                        {!currentQ.quantity_a && !(currentQ.quantity_a_images?.length || currentQ.quantity_a_image) && <div>—</div>}
+                        ) : null}
+                        {!currentQ.quantity_a && !currentQ.quantity_a_image && (!currentQ.quantity_a_images || currentQ.quantity_a_images.length === 0) && <div>—</div>}
                       </div>
                     </div>
                     <div className="space-y-2">
                       <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Quantity B</span>
                       <div className="p-4 rounded-xl bg-white border border-slate-300 text-base font-bold text-slate-900 shadow-sm space-y-3">
                         {currentQ.quantity_b && <div>{currentQ.quantity_b}</div>}
-                        {(currentQ.quantity_b_images || (currentQ.quantity_b_image ? [currentQ.quantity_b_image] : []))?.length > 0 && (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {(currentQ.quantity_b_images || [currentQ.quantity_b_image!]).map((url, idx) => (
-                              <img key={idx} src={url} alt={`Quantity B ${idx + 1}`} className="max-h-40 object-contain rounded-lg border border-slate-200 p-1 bg-slate-50" />
+                        {(currentQ.quantity_b_images?.length || currentQ.quantity_b_image) ? (
+                          <div className="grid grid-cols-1 gap-2 pt-1">
+                            {(currentQ.quantity_b_images && currentQ.quantity_b_images.length > 0 ? currentQ.quantity_b_images : [currentQ.quantity_b_image!]).map((url, idx) => (
+                              <img key={idx} src={url} alt={`Quantity B ${idx + 1}`} className="max-h-52 object-contain rounded-xl border border-slate-200 p-1.5 bg-white shadow-sm" />
                             ))}
                           </div>
-                        )}
-                        {!currentQ.quantity_b && !(currentQ.quantity_b_images?.length || currentQ.quantity_b_image) && <div>—</div>}
+                        ) : null}
+                        {!currentQ.quantity_b && !currentQ.quantity_b_image && (!currentQ.quantity_b_images || currentQ.quantity_b_images.length === 0) && <div>—</div>}
                       </div>
                     </div>
                   </div>
