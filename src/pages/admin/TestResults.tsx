@@ -199,7 +199,7 @@ export const TestResults: React.FC = () => {
 
                   <div className="flex justify-between text-xs text-slate-400">
                     <span>{correctCount} correct of {totalAnswered} attempts</span>
-                    <span>Type: {q.question_type.replace('_', ' ')}</span>
+                    <span>Type: {(q?.question_type || 'MULTIPLE_CHOICE').replace('_', ' ')}</span>
                   </div>
                 </div>
               );

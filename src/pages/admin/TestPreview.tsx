@@ -87,7 +87,7 @@ export const TestPreview: React.FC = () => {
               <div className="space-y-3">
                 <div className="flex items-center space-x-2">
                   <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800">
-                    {currentQ.question_type.replace('_', ' ')}
+                    {(currentQ?.question_type || 'MULTIPLE_CHOICE').replace('_', ' ')}
                   </span>
                   <span className="text-xs text-slate-400">Points: {currentQ.points}</span>
                 </div>

@@ -104,14 +104,38 @@ export const TestSession: React.FC = () => {
 
   // Compile all test questions in sequence across sections
   const allQuestions: Question[] = [];
-  bundle.sections.forEach((s) => {
-    s.questions.forEach((q) => {
+  (bundle.sections || []).forEach((s) => {
+    (s.questions || []).forEach((q) => {
       allQuestions.push({
         ...q,
-        passage: s.passages?.find((p) => p.id === q.passage_id),
+        passage: (s.passages || []).find((p) => p.id === q.passage_id),
       });
     });
   });
+
+  if (allQuestions.length === 0) {
+    return (
+      <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-slate-800 border border-slate-700 rounded-3xl p-8 text-center space-y-5 shadow-2xl">
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center mx-auto border border-amber-500/20">
+            <AlertTriangle className="w-8 h-8" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-bold text-white">No Questions in Test</h2>
+            <p className="text-slate-400 text-sm leading-relaxed">
+              This assessment currently contains no active questions. Please contact your test administrator to add questions.
+            </p>
+          </div>
+          <button
+            onClick={() => navigate('/test/join')}
+            className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-sm transition-all shadow-lg"
+          >
+            Return to Test Join Page
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const currentQ = allQuestions[activeQuestionIdx] || allQuestions[0];
   const currentAnswer = answersMap[currentQ?.id] || {
@@ -249,7 +273,7 @@ export const TestSession: React.FC = () => {
                   Q{activeQuestionIdx + 1}
                 </span>
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200 uppercase">
-                  {currentQ.question_type.replace('_', ' ')}
+                  {(currentQ?.question_type || 'MULTIPLE_CHOICE').replace('_', ' ')}
                 </span>
               </div>
 
