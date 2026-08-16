@@ -469,7 +469,7 @@ export const TestSession: React.FC = () => {
                         {filterValidImages(currentQ.quantity_a_images || currentQ.quantity_a_image).length > 0 && (
                           <div className="grid grid-cols-1 gap-2 pt-1">
                             {filterValidImages(currentQ.quantity_a_images || currentQ.quantity_a_image).map((url, idx) => (
-                              <img key={idx} src={url} alt={`Quantity A Visual ${idx + 1}`} className="max-h-56 object-contain rounded-xl border border-slate-200 p-2 bg-white shadow-sm" />
+                              <img key={idx} src={url} alt={`Quantity A Visual ${idx + 1}`} className="w-full max-h-64 object-contain rounded-xl border border-slate-200 p-2 bg-white shadow-sm" />
                             ))}
                           </div>
                         )}
@@ -483,7 +483,7 @@ export const TestSession: React.FC = () => {
                         {filterValidImages(currentQ.quantity_b_images || currentQ.quantity_b_image).length > 0 && (
                           <div className="grid grid-cols-1 gap-2 pt-1">
                             {filterValidImages(currentQ.quantity_b_images || currentQ.quantity_b_image).map((url, idx) => (
-                              <img key={idx} src={url} alt={`Quantity B Visual ${idx + 1}`} className="max-h-56 object-contain rounded-xl border border-slate-200 p-2 bg-white shadow-sm" />
+                              <img key={idx} src={url} alt={`Quantity B Visual ${idx + 1}`} className="w-full max-h-64 object-contain rounded-xl border border-slate-200 p-2 bg-white shadow-sm" />
                             ))}
                           </div>
                         )}
