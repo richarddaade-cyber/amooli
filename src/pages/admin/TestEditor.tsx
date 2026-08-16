@@ -140,7 +140,7 @@ export const TestEditor: React.FC = () => {
               access_code: generateAccessCode(),
               is_code_active: true,
               duration_minutes: 30,
-              status: 'PUBLISHED',
+              status: 'DRAFT',
               max_attempts: 1,
               result_visibility: 'AFTER_SUBMISSION',
               randomize_questions: false,
@@ -258,8 +258,6 @@ export const TestEditor: React.FC = () => {
     setSaveToast('Syncing question with Supabase Database...');
     try {
       await dbService.saveTestBundle(newBundle);
-      const updated = await dbService.getTestFullDetails(newBundle.test.id);
-      if (updated) setBundle(updated);
       setSaveToast('Question updated and saved to Supabase successfully!');
       setTimeout(() => setSaveToast(null), 3000);
     } catch (err: any) {
@@ -286,8 +284,6 @@ export const TestEditor: React.FC = () => {
       try {
         await dbService.deleteQuestion(qId);
         await dbService.saveTestBundle(newBundle);
-        const updated = await dbService.getTestFullDetails(newBundle.test.id);
-        if (updated) setBundle(updated);
         setSaveToast('Question deleted and test updated in Supabase!');
         setTimeout(() => setSaveToast(null), 3000);
       } catch (err: any) {
@@ -354,10 +350,17 @@ export const TestEditor: React.FC = () => {
     }
     setSaveToast('Saving test details & questions to Supabase Database...');
     try {
-      await dbService.saveTestBundle(bundle);
+      const publishedBundle: TestFullDetails = {
+        ...bundle,
+        test: {
+          ...bundle.test,
+          status: 'PUBLISHED',
+          updated_at: new Date().toISOString(),
+        },
+      };
+      setBundle(publishedBundle);
+      await dbService.saveTestBundle(publishedBundle);
       await dbService.updateTestStatus(bundle.test.id, 'PUBLISHED');
-      const updated = await dbService.getTestFullDetails(bundle.test.id);
-      if (updated) setBundle(updated);
       setSaveToast('Test successfully saved & published!');
       setTimeout(() => setSaveToast(null), 3000);
       alert('Test successfully published!');
