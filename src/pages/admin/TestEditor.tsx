@@ -709,7 +709,32 @@ export const TestEditor: React.FC = () => {
               )}
             </div>
 
-            <div className="flex items-center space-x-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center space-x-2 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm">
+                <Clock className="w-4 h-4 text-blue-600" />
+                <span className="text-xs font-bold text-slate-700">Section Time:</span>
+                <input
+                  type="number"
+                  min="1"
+                  max="180"
+                  placeholder="Minutes"
+                  value={activeSection.duration_minutes !== undefined && activeSection.duration_minutes !== null ? activeSection.duration_minutes : ''}
+                  onChange={(e) => {
+                    const val = e.target.value ? parseInt(e.target.value) : undefined;
+                    const updatedSections = [...bundle.sections];
+                    updatedSections[activeSectionIdx] = {
+                      ...activeSection,
+                      duration_minutes: val,
+                    };
+                    const newBundle = { ...bundle, sections: updatedSections };
+                    setBundle(newBundle);
+                    dbService.saveTestBundle(newBundle);
+                  }}
+                  className="w-16 px-2 py-1 border border-slate-300 rounded-lg text-center font-bold text-xs bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+                <span className="text-xs text-slate-500 font-medium">mins</span>
+              </div>
+
               <button
                 onClick={() => setShowPassageModal(true)}
                 className="px-3.5 py-2 rounded-xl bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-semibold shadow-sm transition-colors flex items-center space-x-1.5"

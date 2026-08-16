@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { dbService } from '../../services/db';
 import { calculateTimerStatus, TimerStatus } from '../../services/timer';
@@ -31,10 +31,16 @@ export const TestSession: React.FC = () => {
   // Active question navigation index
   const [activeQuestionIdx, setActiveQuestionIdx] = useState(0);
 
+  // Section-level timing & intermission break states
+  const [currentSectionIdx, setCurrentSectionIdx] = useState(0);
+  const [sectionStartedAt, setSectionStartedAt] = useState<string>('');
+  const [isIntermission, setIsIntermission] = useState(false);
+  const [breakSecondsRemaining, setBreakSecondsRemaining] = useState(120);
+
   // Timer state
   const [timer, setTimer] = useState<TimerStatus | null>(null);
 
-  // Autosave feedback state ('saved' | 'saving' | 'error')
+  // Autosave feedback state ('saved' | 'saving' | 'idle')
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'idle'>('saved');
 
   // Question Navigator Drawer state for mobile/desktop
@@ -65,38 +71,153 @@ export const TestSession: React.FC = () => {
       setAttempt(attData);
       setBundle(tData);
       setAnswersMap(attData.answers || {});
+      setSectionStartedAt(attData.started_at);
       setLoading(false);
     };
 
     load();
   }, [attemptId]);
 
-  // Timer Tick & Expiry Check Loop
+  // Section Timer Tick & Intermission Break Loop
   useEffect(() => {
-    if (!attempt || !bundle || attempt.status !== 'IN_PROGRESS') return;
+    if (!attempt || !bundle || attempt.status !== 'IN_PROGRESS' || !sectionStartedAt) return;
+
+    if (isIntermission) {
+      const breakInterval = setInterval(() => {
+        setBreakSecondsRemaining((prev) => {
+          if (prev <= 1) {
+            clearInterval(breakInterval);
+            startNextSection();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(breakInterval);
+    }
+
+    const currentSection = (bundle.sections || [])[currentSectionIdx];
+    const sectionDuration = currentSection?.duration_minutes || bundle.test.duration_minutes;
 
     const tick = async () => {
-      const status = calculateTimerStatus(attempt.started_at, bundle.test.duration_minutes);
+      const status = calculateTimerStatus(sectionStartedAt, sectionDuration);
       setTimer(status);
 
       if (status.isExpired) {
-        // Auto-submit when time expires
-        await dbService.submitAttempt(attempt.id, true);
-        navigate(`/test/submitted/${attempt.id}`);
+        // Section timer expired — auto-save & transition
+        dbService.logEvent(attempt.id, 'SECTION_TIMEOUT' as any, { section_idx: currentSectionIdx });
+
+        if (currentSectionIdx < (bundle.sections || []).length - 1) {
+          setIsIntermission(true);
+          setBreakSecondsRemaining(120);
+        } else {
+          // Final section expired — submit attempt
+          await dbService.submitAttempt(attempt.id, true);
+          navigate(`/test/submitted/${attempt.id}`);
+        }
       }
     };
 
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [attempt, bundle]);
+  }, [attempt, bundle, currentSectionIdx, sectionStartedAt, isIntermission]);
 
-  if (loading || !attempt || !bundle || !timer) {
+  const startNextSection = () => {
+    if (!bundle) return;
+    const nextIdx = currentSectionIdx + 1;
+    if (nextIdx < (bundle.sections || []).length) {
+      setCurrentSectionIdx(nextIdx);
+      setSectionStartedAt(new Date().toISOString());
+      setIsIntermission(false);
+
+      // Compute first question index of next section
+      let accum = 0;
+      for (let i = 0; i < nextIdx; i++) {
+        accum += (bundle.sections[i]?.questions || []).length;
+      }
+      setActiveQuestionIdx(accum);
+    } else {
+      handleFinalSubmit();
+    }
+  };
+
+  const handleFinalSubmit = async () => {
+    if (!attempt) return;
+    await dbService.submitAttempt(attempt.id, false);
+    navigate(`/test/submitted/${attempt.id}`);
+  };
+
+  if (loading || !attempt || !bundle) {
     return (
       <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">
         <div className="text-center space-y-3">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500 mx-auto"></div>
           <p className="text-sm text-slate-400 font-medium">Loading Assessment Session...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 2-Minute Intermission Break Render Screen
+  if (isIntermission) {
+    const nextSection = (bundle.sections || [])[currentSectionIdx + 1];
+    const breakMins = Math.floor(breakSecondsRemaining / 60);
+    const breakSecs = breakSecondsRemaining % 60;
+    const formattedBreak = `${String(breakMins).padStart(2, '0')}:${String(breakSecs).padStart(2, '0')}`;
+
+    return (
+      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-6 select-none">
+        <div className="max-w-xl w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 sm:p-10 space-y-8 shadow-2xl text-center">
+          <div className="space-y-3">
+            <div className="w-16 h-16 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mx-auto shadow-inner">
+              <Clock className="w-8 h-8 animate-pulse" />
+            </div>
+            <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider">
+              Section {currentSectionIdx + 1} Answers Saved Automatically
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-extrabold text-white">2-Minute Scheduled Intermission</h2>
+            <p className="text-slate-400 text-sm max-w-md mx-auto leading-relaxed">
+              Take a short rest. Rest your eyes and stretch before beginning the next section.
+            </p>
+          </div>
+
+          <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 space-y-2 shadow-inner">
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-widest">Intermission Time Remaining</div>
+            <div className="text-4xl sm:text-5xl font-mono font-extrabold text-blue-400 tracking-wider">
+              {formattedBreak}
+            </div>
+            <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mt-3">
+              <div
+                className="bg-blue-500 h-full transition-all duration-1000"
+                style={{ width: `${(breakSecondsRemaining / 120) * 100}%` }}
+              />
+            </div>
+          </div>
+
+          {nextSection && (
+            <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-5 text-left space-y-2">
+              <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Up Next</div>
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-white text-base">{nextSection.title}</span>
+                <span className="text-xs font-bold bg-blue-500/20 text-blue-300 px-2.5 py-1 rounded-lg border border-blue-500/30">
+                  {nextSection.duration_minutes || bundle.test.duration_minutes} Mins • {(nextSection.questions || []).length} Qs
+                </span>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <button
+              onClick={startNextSection}
+              className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold text-base rounded-2xl transition-all shadow-xl hover:shadow-blue-600/25 flex items-center justify-center space-x-2 active:scale-[0.99]"
+            >
+              <span>Start Next Section Now</span>
+              <ChevronRight className="w-5 h-5" />
+            </button>
+            <p className="text-xs text-slate-500">The next section will automatically begin when the break timer reaches 00:00.</p>
+          </div>
         </div>
       </div>
     );
@@ -165,18 +286,15 @@ export const TestSession: React.FC = () => {
       updated_at: new Date().toISOString(),
     };
 
-    // Update local state map immediately for instant feedback
     const newAnswersMap = { ...answersMap, [currentQ.id]: updatedAns };
     setAnswersMap(newAnswersMap);
 
-    // Save to Database Layer
     await dbService.saveAnswer(attempt.id, currentQ.id, payload);
     setSaveStatus('saved');
   };
 
   const handleSelectOption = (optionId: string) => {
     if (currentQ.question_type === 'SENTENCE_EQUIVALENCE') {
-      // Multi select (up to 2 options)
       let selected = [...currentAnswer.selected_option_ids];
       if (selected.includes(optionId)) {
         selected = selected.filter((id) => id !== optionId);
@@ -186,14 +304,8 @@ export const TestSession: React.FC = () => {
       }
       handleAnswerChange({ selectedOptionIds: selected });
     } else {
-      // Single select toggle
       handleAnswerChange({ selectedOptionIds: [optionId] });
     }
-  };
-
-  const handleFinalSubmit = async () => {
-    await dbService.submitAttempt(attempt.id, false);
-    navigate(`/test/submitted/${attempt.id}`);
   };
 
   const answeredCount = Object.values(answersMap).filter(
@@ -201,6 +313,7 @@ export const TestSession: React.FC = () => {
   ).length;
 
   const markedCount = Object.values(answersMap).filter((a) => a.is_marked_for_review).length;
+  const activeSectionObj = (bundle.sections || [])[currentSectionIdx];
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans select-none">
@@ -221,26 +334,27 @@ export const TestSession: React.FC = () => {
                 {bundle.test.title}
               </h1>
               <div className="flex items-center space-x-2 text-xs text-slate-400">
-                <span>Candidate: <strong className="text-slate-200">{attempt.candidate_name}</strong></span>
-                <span>•</span>
-                <span className="text-emerald-400 font-semibold flex items-center space-x-1">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                  <span>Autosave: {saveStatus === 'saving' ? 'Saving...' : 'Saved'}</span>
+                <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 font-bold">
+                  Section {currentSectionIdx + 1} of {(bundle.sections || []).length}: {activeSectionObj?.title || `Section ${currentSectionIdx + 1}`}
                 </span>
+                <span className="hidden sm:inline">•</span>
+                <span className="hidden sm:inline">Candidate: <strong className="text-slate-200">{attempt.candidate_name}</strong></span>
               </div>
             </div>
           </div>
 
           {/* Countdown Timer Badge & Actions */}
           <div className="flex items-center space-x-3">
-            <div className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-xl border font-mono font-bold text-sm sm:text-base transition-colors ${
-              timer.remainingSeconds < 300
-                ? 'bg-rose-500/20 border-rose-500 text-rose-400 animate-pulse'
-                : 'bg-slate-800 border-slate-700 text-emerald-400'
-            }`}>
-              <Clock className="w-4 h-4" />
-              <span>{timer.formattedTime}</span>
-            </div>
+            {timer && (
+              <div className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-xl border font-mono font-bold text-sm sm:text-base transition-colors ${
+                timer.remainingSeconds < 300
+                  ? 'bg-rose-500/20 border-rose-500 text-rose-400 animate-pulse'
+                  : 'bg-slate-800 border-slate-700 text-emerald-400'
+              }`}>
+                <Clock className="w-4 h-4" />
+                <span>{timer.formattedTime}</span>
+              </div>
+            )}
 
             <button
               onClick={() => setShowSubmitModal(true)}
@@ -450,14 +564,34 @@ export const TestSession: React.FC = () => {
               Question {activeQuestionIdx + 1} of {allQuestions.length}
             </span>
 
-            <button
-              onClick={() => setActiveQuestionIdx(Math.min(allQuestions.length - 1, activeQuestionIdx + 1))}
-              disabled={activeQuestionIdx === allQuestions.length - 1}
-              className="px-6 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-500 disabled:opacity-40 flex items-center space-x-1.5 shadow-md"
-            >
-              <span>Next</span>
-              <ChevronRight className="w-4 h-4" />
-            </button>
+            {activeQuestionIdx < allQuestions.length - 1 ? (
+              <button
+                onClick={() => setActiveQuestionIdx(activeQuestionIdx + 1)}
+                className="px-6 py-2.5 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-500 flex items-center space-x-1.5 shadow-md"
+              >
+                <span>Next</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            ) : currentSectionIdx < (bundle.sections || []).length - 1 ? (
+              <button
+                onClick={() => {
+                  setIsIntermission(true);
+                  setBreakSecondsRemaining(120);
+                }}
+                className="px-6 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-500 flex items-center space-x-1.5 shadow-md"
+              >
+                <span>Finish Section & Take Break</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            ) : (
+              <button
+                onClick={() => setShowSubmitModal(true)}
+                className="px-6 py-2.5 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-500 flex items-center space-x-1.5 shadow-md"
+              >
+                <span>Submit Final Exam</span>
+                <Send className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
 
