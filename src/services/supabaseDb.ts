@@ -12,7 +12,7 @@ import {
   TestFullDetails,
 } from '../types/database';
 import { generateAccessCode } from './timer';
-import { calculateAttemptScore } from './scoring';
+import { calculateAttemptScore, evaluateQuestionAnswer } from './scoring';
 
 function generateUuid(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -499,14 +499,16 @@ export const supabaseDb = {
       attempt_id: attemptId,
       question_id: questionId,
       selected_option_ids: payload.selectedOptionIds || [],
-      selected_option_id: payload.selectedOptionIds?.[0] || null,
-      text_response: payload.textAnswer || null,
+      text_answer: payload.textAnswer || null,
       is_marked_for_review: payload.isMarkedForReview || false,
       updated_at: now,
     };
 
     try {
-      await client.from('answers').upsert(ansRow, { onConflict: 'attempt_id,question_id' });
+      const { error } = await client.from('answers').upsert(ansRow, { onConflict: 'attempt_id,question_id' });
+      if (error) {
+        console.error('Error saving answer row to Supabase:', error);
+      }
     } catch (e) {
       console.warn('Supabase saveAnswer notice:', e);
     }
@@ -558,7 +560,31 @@ export const supabaseDb = {
     };
 
     await client.from('attempts').upsert(updatedAttempt);
-    return updatedAttempt;
+
+    // Save individual evaluated answers with is_correct and score_awarded to Supabase
+    for (const q of allQuestions) {
+      const ans = answersMap[q.id];
+      if (ans) {
+        const evalRes = evaluateQuestionAnswer(q, ans);
+        const ansRow = {
+          id: ans.id && ans.id !== '' ? ans.id : generateUuid(),
+          attempt_id: attemptId,
+          question_id: q.id,
+          selected_option_ids: ans.selected_option_ids || [],
+          text_answer: ans.text_answer || '',
+          is_marked_for_review: ans.is_marked_for_review || false,
+          is_correct: evalRes.isCorrect,
+          score_awarded: evalRes.scoreAwarded,
+          updated_at: now,
+        };
+        await client.from('answers').upsert(ansRow, { onConflict: 'attempt_id,question_id' });
+      }
+    }
+
+    return {
+      ...updatedAttempt,
+      answers: answersMap,
+    };
   },
 
   /**

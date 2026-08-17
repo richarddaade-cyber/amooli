@@ -114,7 +114,7 @@ export const TestSession: React.FC = () => {
           setBreakSecondsRemaining(120);
         } else {
           // Final section expired — submit attempt
-          await dbService.submitAttempt(attempt.id, true);
+          await dbService.submitAttempt(attempt.id, true, answersMap);
           navigate(`/test/submitted/${attempt.id}`);
         }
       }
@@ -123,7 +123,7 @@ export const TestSession: React.FC = () => {
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [attempt, bundle, currentSectionIdx, sectionStartedAt, isIntermission]);
+  }, [attempt, bundle, currentSectionIdx, sectionStartedAt, isIntermission, answersMap]);
 
   const startNextSection = () => {
     if (!bundle) return;
@@ -140,7 +140,7 @@ export const TestSession: React.FC = () => {
 
   const handleFinalSubmit = async () => {
     if (!attempt) return;
-    await dbService.submitAttempt(attempt.id, false);
+    await dbService.submitAttempt(attempt.id, false, answersMap);
     navigate(`/test/submitted/${attempt.id}`);
   };
 

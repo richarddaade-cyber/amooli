@@ -631,23 +631,25 @@ export const dbService = {
   /**
    * Submit an attempt & auto-score — Persists to Supabase Database
    */
-  async submitAttempt(attemptId: string, forceExpired = false): Promise<Attempt> {
+  async submitAttempt(attemptId: string, forceExpired = false, answersMapOverride?: Record<string, Answer>): Promise<Attempt> {
     const attempt = await this.getAttempt(attemptId);
     if (!attempt) throw new Error('Attempt not found.');
 
     const bundle = await this.getTestFullDetails(attempt.test_id);
     if (!bundle) throw new Error('Test definition missing.');
 
+    const activeAnswers = answersMapOverride || attempt.answers || {};
+
     let submittedAttempt: Attempt;
     try {
-      submittedAttempt = await supabaseDb.submitAttempt(attemptId, attempt.answers || {}, bundle);
+      submittedAttempt = await supabaseDb.submitAttempt(attemptId, activeAnswers, bundle);
       if (forceExpired) {
         submittedAttempt.status = 'EXPIRED';
       }
     } catch (e) {
       const allQuestions: Question[] = [];
       bundle.sections.forEach((s) => allQuestions.push(...s.questions));
-      const scoreResult = calculateAttemptScore(allQuestions, attempt.answers || {});
+      const scoreResult = calculateAttemptScore(allQuestions, activeAnswers);
 
       submittedAttempt = {
         ...attempt,
@@ -656,6 +658,7 @@ export const dbService = {
         score: scoreResult.score,
         max_score: scoreResult.maxScore,
         percentage: scoreResult.percentage,
+        answers: activeAnswers,
       };
     }
 
