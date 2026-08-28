@@ -355,28 +355,46 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
         </div>
       )}
 
+      {/* Analytical Writing Notice Banner */}
+      {questionType === 'ANALYTICAL_WRITING' && (
+        <div className="bg-amber-50 border border-amber-300 rounded-xl p-3.5 text-xs text-amber-950 flex items-center space-x-2 shadow-sm">
+          <Sparkles className="w-4.5 h-4.5 text-amber-600 flex-shrink-0" />
+          <span>
+            <strong>GRE Analytical Writing Task:</strong> Only enter the Essay Prompt statement below. Options, answer choices, and numeric keys are omitted. Gemini AI evaluates candidate essays automatically on the official 0.0–6.0 scale upon submission.
+          </span>
+        </div>
+      )}
+
       {/* 2. Question Prompt */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Question Prompt / Text</label>
-          <label className="cursor-pointer text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center space-x-1.5 border border-blue-200 bg-blue-50/50 px-3 py-1 rounded-lg">
-            <ImageIcon className="w-4 h-4" />
-            <span>+ Add Prompt Images</span>
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={(e) => handleMultipleImagesUpload(e, setImageUrls)}
-            />
+          <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+            {questionType === 'ANALYTICAL_WRITING' ? 'Essay Issue Prompt Statement' : 'Question Prompt / Text'}
           </label>
+          {questionType !== 'ANALYTICAL_WRITING' && (
+            <label className="cursor-pointer text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center space-x-1.5 border border-blue-200 bg-blue-50/50 px-3 py-1 rounded-lg">
+              <ImageIcon className="w-4 h-4" />
+              <span>+ Add Prompt Images</span>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => handleMultipleImagesUpload(e, setImageUrls)}
+              />
+            </label>
+          )}
         </div>
 
         <textarea
-          rows={3}
+          rows={questionType === 'ANALYTICAL_WRITING' ? 4 : 3}
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Enter or paste your question text here..."
+          placeholder={
+            questionType === 'ANALYTICAL_WRITING'
+              ? 'Enter the GRE Essay Issue Prompt statement here (e.g., As people rely more and more on technology to solve problems, the ability of humans to think for themselves will surely deteriorate.)'
+              : 'Enter or paste your question text here...'
+          }
           className="w-full p-3.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
         />
 
@@ -554,7 +572,7 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
       )}
 
       {/* 4. Options List (for MC / Quant Comparison / Sentence Eq) */}
-      {questionType !== 'NUMERIC_ENTRY' && (
+      {questionType !== 'NUMERIC_ENTRY' && questionType !== 'ANALYTICAL_WRITING' && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -627,14 +645,20 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
         </div>
       )}
 
-      {/* 5. Answer Explanation */}
+      {/* 5. Specific Directions / Explanation */}
       <div className="space-y-2 pt-2 border-t border-slate-200">
-        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Answer Explanation</label>
+        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+          {questionType === 'ANALYTICAL_WRITING' ? 'Specific Task Directions (Optional)' : 'Answer Explanation'}
+        </label>
         <textarea
-          rows={2}
+          rows={questionType === 'ANALYTICAL_WRITING' ? 3 : 2}
           value={explanation}
           onChange={(e) => setExplanation(e.target.value)}
-          placeholder="Provide step-by-step solution or explanation for candidate review..."
+          placeholder={
+            questionType === 'ANALYTICAL_WRITING'
+              ? 'e.g. Write a response in which you discuss the extent to which you agree or disagree with the statement and explain your reasoning for the position you take...'
+              : 'Provide step-by-step solution or explanation for candidate review...'
+          }
           className="w-full p-3 border border-slate-300 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
