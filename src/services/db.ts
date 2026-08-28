@@ -15,6 +15,7 @@ import { generateAccessCode } from './timer';
 import { calculateAttemptScore } from './scoring';
 import { supabaseDb } from './supabaseDb';
 import { OFFICIAL_GRE_ISSUE_POOL } from './greIssuePool';
+import { scoreGreEssay } from './geminiService';
 
 const LOCAL_STORAGE_KEY_TESTS = 'preppulse_tests';
 const LOCAL_STORAGE_KEY_ATTEMPTS = 'preppulse_attempts';
@@ -757,6 +758,39 @@ export const dbService = {
     if (!bundle) throw new Error('Test definition missing.');
 
     const activeAnswers = answersMapOverride || attempt.answers || {};
+    const allQuestions: Question[] = [];
+    bundle.sections.forEach((s) => allQuestions.push(...(s.questions || [])));
+
+    // Unconditionally evaluate any Analytical Writing essay questions via scoreGreEssay (Gemini AI or fallback)
+    for (const q of allQuestions) {
+      if (q.question_type === 'ANALYTICAL_WRITING') {
+        const ans = activeAnswers[q.id];
+        const essayText = ans?.text_answer || '';
+        try {
+          const essayEval = await scoreGreEssay(q.prompt, essayText);
+          if (ans) {
+            ans.essay_feedback = essayEval;
+            ans.score_awarded = essayEval.score;
+            ans.is_correct = essayEval.score >= 3.5;
+          } else {
+            activeAnswers[q.id] = {
+              id: `ans-${attemptId}-${q.id}`,
+              attempt_id: attemptId,
+              question_id: q.id,
+              selected_option_ids: [],
+              text_answer: essayText,
+              is_marked_for_review: false,
+              is_correct: essayEval.score >= 3.5,
+              score_awarded: essayEval.score,
+              essay_feedback: essayEval,
+              updated_at: new Date().toISOString(),
+            };
+          }
+        } catch (e) {
+          console.warn('Gemini essay scoring notice:', e);
+        }
+      }
+    }
 
     let submittedAttempt: Attempt;
     try {
@@ -765,8 +799,6 @@ export const dbService = {
         submittedAttempt.status = 'EXPIRED';
       }
     } catch (e) {
-      const allQuestions: Question[] = [];
-      bundle.sections.forEach((s) => allQuestions.push(...s.questions));
       const scoreResult = calculateAttemptScore(allQuestions, activeAnswers);
 
       submittedAttempt = {
