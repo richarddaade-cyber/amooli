@@ -9,10 +9,12 @@ import {
   EventLog,
   TestStatus,
   TestFullDetails,
+  QuestionType,
 } from '../types/database';
 import { generateAccessCode } from './timer';
 import { calculateAttemptScore } from './scoring';
 import { supabaseDb } from './supabaseDb';
+import { OFFICIAL_GRE_ISSUE_POOL } from './greIssuePool';
 
 const LOCAL_STORAGE_KEY_TESTS = 'preppulse_tests';
 const LOCAL_STORAGE_KEY_ATTEMPTS = 'preppulse_attempts';
@@ -194,6 +196,56 @@ Contrary to early hypotheses suggesting ocean stagnation, deep-water current vel
     ],
   },
 ];
+
+// --- Official GRE Issue Pool Generated Tests ---
+const ISSUE_POOL_TESTS: TestFullDetails[] = OFFICIAL_GRE_ISSUE_POOL.map((topic) => ({
+  test: {
+    id: `test-gre-issue-${topic.id}`,
+    title: `GRE Writing #${topic.id}: ${topic.prompt.substring(0, 50)}...`,
+    description: `Official GRE 30-minute Analytical Writing Issue Task #${topic.id} (${topic.category || 'Analyze an Issue'}). Respond to the prompt and receive instant Gemini AI strict scoring (0.0–6.0).`,
+    instructions: 'You will have 30 minutes to plan and compose a response to the given issue prompt. Respond according to the specific directions provided. Copying and pasting external text is strictly disabled to simulate official ETS test day security.',
+    duration_minutes: 30,
+    status: 'ACTIVE' as const,
+    access_code: topic.accessCode,
+    max_attempts: 5,
+    result_visibility: 'AFTER_SUBMISSION' as const,
+    randomize_questions: false,
+    randomize_options: false,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    sections_count: 1,
+    questions_count: 1,
+  },
+  sections: [
+    {
+      id: `sec-issue-${topic.id}`,
+      test_id: `test-gre-issue-${topic.id}`,
+      title: 'Section 1: Analytical Writing (Analyze an Issue)',
+      description: 'Timed 30-minute Analytical Writing Issue Essay Task.',
+      duration_minutes: 30,
+      position: 1,
+      created_at: new Date().toISOString(),
+      passages: [],
+      questions: [
+        {
+          id: `q-issue-${topic.id}`,
+          section_id: `sec-issue-${topic.id}`,
+          question_type: 'ANALYTICAL_WRITING' as const,
+          prompt: topic.prompt,
+          explanation: topic.directions,
+          points: 6,
+          position: 1,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          options: [],
+        },
+      ],
+    },
+  ],
+}));
+
+// Append all official Issue Pool tests into SEED_TESTS
+SEED_TESTS.push(...ISSUE_POOL_TESTS);
 
 // --- Local Storage Management Helpers ---
 function sanitizeBundle(b: any): TestFullDetails {

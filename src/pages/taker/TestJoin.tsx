@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { dbService } from '../../services/db';
-import { BookOpen, KeyRound, User, ArrowRight, AlertCircle, ShieldCheck } from 'lucide-react';
+import { OFFICIAL_GRE_ISSUE_POOL } from '../../services/greIssuePool';
+import { BookOpen, KeyRound, User, ArrowRight, AlertCircle, ShieldCheck, Sparkles } from 'lucide-react';
 
 export const TestJoin: React.FC = () => {
   const [accessCode, setAccessCode] = useState('');
@@ -148,18 +149,51 @@ export const TestJoin: React.FC = () => {
               />
             </div>
 
-            {/* Quick Demo Access Button */}
-            <div className="pt-1 text-right">
-              <button
-                type="button"
-                onClick={() => {
-                  setAccessCode('Q7K4P9');
-                  setCandidateName('Candidate Demo User');
-                }}
-                className="text-xs text-blue-400 hover:text-blue-300 font-semibold underline"
-              >
-                Use Demo Sample Code (Q7K4P9)
-              </button>
+            {/* Quick Demo & GRE Writing Access Buttons */}
+            <div className="pt-2 border-t border-slate-700/60 space-y-3">
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAccessCode('Q7K4P9');
+                    setCandidateName('Candidate Demo User');
+                  }}
+                  className="text-xs text-blue-400 hover:text-blue-300 font-semibold underline"
+                >
+                  Quant Demo (Q7K4P9)
+                </button>
+                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center space-x-1">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>GRE Writing Topics Pool:</span>
+                </span>
+              </div>
+
+              <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2 bg-slate-900/60 rounded-xl border border-slate-700/50">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAccessCode('WRITING1');
+                    setCandidateName('GRE Writing Candidate');
+                  }}
+                  className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition-colors"
+                >
+                  WRITING1 (Sample Issue)
+                </button>
+                {OFFICIAL_GRE_ISSUE_POOL.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    title={`Topic #${t.id}: ${t.prompt}`}
+                    onClick={() => {
+                      setAccessCode(t.accessCode);
+                      setCandidateName(`GRE Candidate (Topic #${t.id})`);
+                    }}
+                    className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-slate-800 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-slate-700 transition-colors"
+                  >
+                    {t.accessCode}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <button
