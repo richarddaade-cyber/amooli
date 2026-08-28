@@ -469,10 +469,11 @@ export const supabaseDb = {
         attempt_id: ans.attempt_id,
         question_id: ans.question_id,
         selected_option_ids: ans.selected_option_ids || (ans.selected_option_id ? [ans.selected_option_id] : []),
-        text_answer: ans.text_response || ans.text_answer || '',
+        text_answer: ans.text_answer || ans.text_response || '',
         is_marked_for_review: ans.is_marked_for_review || false,
         is_correct: ans.is_correct,
         score_awarded: ans.score_awarded,
+        essay_feedback: ans.essay_feedback || null,
         updated_at: ans.created_at || ans.updated_at || new Date().toISOString(),
       };
     });
@@ -492,18 +493,39 @@ export const supabaseDb = {
     payload: { selectedOptionIds?: string[]; textAnswer?: string; isMarkedForReview?: boolean }
   ): Promise<Answer> {
     const client = getSupabaseClient();
-    const answerId = generateUuid();
     const now = new Date().toISOString();
 
-    const ansRow = {
+    // Check existing answer to preserve text_answer if textAnswer parameter was omitted
+    let existing: any = null;
+    try {
+      const { data } = await client
+        .from('answers')
+        .select('*')
+        .eq('attempt_id', attemptId)
+        .eq('question_id', questionId)
+        .maybeSingle();
+      existing = data;
+    } catch (e) {}
+
+    const answerId = existing?.id || generateUuid();
+    const textAns = payload.textAnswer !== undefined ? payload.textAnswer : (existing?.text_answer || existing?.text_response || '');
+    const optionIds = payload.selectedOptionIds !== undefined ? payload.selectedOptionIds : (existing?.selected_option_ids || []);
+    const marked = payload.isMarkedForReview !== undefined ? payload.isMarkedForReview : (existing?.is_marked_for_review || false);
+
+    const ansRow: any = {
       id: answerId,
       attempt_id: attemptId,
       question_id: questionId,
-      selected_option_ids: payload.selectedOptionIds || [],
-      text_answer: payload.textAnswer || null,
-      is_marked_for_review: payload.isMarkedForReview || false,
+      selected_option_ids: optionIds,
+      text_answer: textAns,
+      text_response: textAns,
+      is_marked_for_review: marked,
       updated_at: now,
     };
+
+    if (existing?.essay_feedback) {
+      ansRow.essay_feedback = existing.essay_feedback;
+    }
 
     try {
       const { error } = await client.from('answers').upsert(ansRow, { onConflict: 'attempt_id,question_id' });
@@ -518,9 +540,10 @@ export const supabaseDb = {
       id: answerId,
       attempt_id: attemptId,
       question_id: questionId,
-      selected_option_ids: payload.selectedOptionIds || [],
-      text_answer: payload.textAnswer || '',
-      is_marked_for_review: payload.isMarkedForReview || false,
+      selected_option_ids: optionIds,
+      text_answer: textAns,
+      is_marked_for_review: marked,
+      essay_feedback: existing?.essay_feedback,
       updated_at: now,
     };
   },
