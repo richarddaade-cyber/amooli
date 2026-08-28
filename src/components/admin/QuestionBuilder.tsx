@@ -18,6 +18,7 @@ import {
 interface QuestionBuilderProps {
   question: Partial<Question>;
   passages: Passage[];
+  defaultType?: QuestionType;
   onSave: (updatedQuestion: Question) => void;
   onCancel: () => void;
 }
@@ -59,11 +60,12 @@ export function filterValidImages(urls: any): string[] {
 export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
   question = {},
   passages = [],
+  defaultType,
   onSave,
   onCancel,
 }) => {
   const [questionType, setQuestionType] = useState<QuestionType>(
-    question.question_type || 'MULTIPLE_CHOICE'
+    question.question_type || defaultType || 'MULTIPLE_CHOICE'
   );
   const [prompt, setPrompt] = useState(question.prompt || '');
   const [isProcessingImages, setIsProcessingImages] = useState<boolean>(false);
@@ -94,7 +96,11 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
     question.numeric_tolerance !== undefined ? question.numeric_tolerance : 0
   );
   const [explanation, setExplanation] = useState(question.explanation || '');
-  const [points, setPoints] = useState<number>(question.points || 1.0);
+  const [points, setPoints] = useState<number>(() => {
+    if (question.points !== undefined) return question.points;
+    if (questionType === 'ANALYTICAL_WRITING') return 6.0;
+    return 1.0;
+  });
   const [passageId, setPassageId] = useState<string>(question.passage_id || '');
 
   // Default options setup according to question type

@@ -813,13 +813,15 @@ export const TestEditor: React.FC = () => {
                 <span className="text-xs text-slate-500 font-medium">mins</span>
               </div>
 
-              <button
-                onClick={() => setShowPassageModal(true)}
-                className="px-3.5 py-2 rounded-xl bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-semibold shadow-sm transition-colors flex items-center space-x-1.5"
-              >
-                <BookOpen className="w-4 h-4 text-amber-600" />
-                <span>+ Reading Passage</span>
-              </button>
+              {!activeSection.title.toLowerCase().includes('writing') && (
+                <button
+                  onClick={() => setShowPassageModal(true)}
+                  className="px-3.5 py-2 rounded-xl bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-semibold shadow-sm transition-colors flex items-center space-x-1.5"
+                >
+                  <BookOpen className="w-4 h-4 text-amber-600" />
+                  <span>+ Reading Passage</span>
+                </button>
+              )}
 
               <button
                 onClick={() => {
@@ -876,6 +878,7 @@ export const TestEditor: React.FC = () => {
             <QuestionBuilder
               question={editingQuestion || {}}
               passages={activeSection.passages || []}
+              defaultType={activeSection.title.toLowerCase().includes('writing') ? 'ANALYTICAL_WRITING' : undefined}
               onSave={handleSaveQuestion}
               onCancel={() => {
                 setEditingQuestion(null);
