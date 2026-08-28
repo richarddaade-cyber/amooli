@@ -316,6 +316,24 @@ function getStoredTestBundles(): TestFullDetails[] {
     }
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return SEED_TESTS;
+
+    // Merge any missing SEED_TESTS (such as ISSUE001-ISSUE159) into localStorage
+    const existingIds = new Set(parsed.map((b: any) => b?.test?.id));
+    let updated = false;
+    for (const seed of SEED_TESTS) {
+      if (!existingIds.has(seed.test.id)) {
+        parsed.push(seed);
+        updated = true;
+      }
+    }
+    if (updated) {
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEY_TESTS, JSON.stringify(parsed));
+      } catch (e) {
+        console.warn('Could not update localStorage with new seed tests:', e);
+      }
+    }
+
     return parsed.map(sanitizeBundle);
   } catch (err) {
     console.error('Error reading local tests:', err);
@@ -434,9 +452,12 @@ export const dbService = {
       console.warn('Supabase getTestByAccessCode notice:', e);
     }
 
-    // 2. Fallback to Local Storage
+    // 2. Fallback to Local Storage & SEED_TESTS
     const bundles = getStoredTestBundles();
-    const found = bundles.find((b) => b.test.access_code?.toUpperCase() === cleanCode);
+    let found = bundles.find((b) => b.test.access_code?.toUpperCase() === cleanCode);
+    if (!found) {
+      found = SEED_TESTS.find((b) => b.test.access_code?.toUpperCase() === cleanCode);
+    }
 
     if (!found) {
       return { bundle: null, error: 'Invalid access code. Please check the code and try again.' };
