@@ -56,6 +56,69 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 <PlusCircle className="w-4 h-4" />
                 <span>Create Test</span>
               </Link>
+
+              <button
+                onClick={async () => {
+                  const newId = `test-writing-${Date.now()}`;
+                  const secId = `sec-writing-${Date.now()}`;
+                  const qId = `q-writing-${Date.now()}`;
+                  const accessCode = `WRIT${Math.floor(100 + Math.random() * 900)}`;
+
+                  const newWritingTest = {
+                    test: {
+                      id: newId,
+                      title: 'GRE Analytical Writing — Issue Essay Task',
+                      description: 'Official 30-minute GRE Analytical Writing Issue Task. Compose a well-reasoned argument and receive instant Gemini AI strict scoring (0.0–6.0).',
+                      instructions: 'You will have 30 minutes to plan and compose a response to the given issue prompt. Copying and pasting external text is strictly disabled to simulate official ETS test day security.',
+                      duration_minutes: 30,
+                      status: 'PUBLISHED' as any,
+                      access_code: accessCode,
+                      max_attempts: 5,
+                      result_visibility: 'AFTER_SUBMISSION' as const,
+                      randomize_questions: false,
+                      randomize_options: false,
+                      created_at: new Date().toISOString(),
+                      updated_at: new Date().toISOString(),
+                    },
+                    sections: [
+                      {
+                        id: secId,
+                        test_id: newId,
+                        title: 'Section 1: Analytical Writing (Analyze an Issue)',
+                        description: 'Timed 30-minute Analytical Writing Essay Task.',
+                        duration_minutes: 30,
+                        position: 1,
+                        created_at: new Date().toISOString(),
+                        passages: [],
+                        questions: [
+                          {
+                            id: qId,
+                            section_id: secId,
+                            question_type: 'ANALYTICAL_WRITING' as const,
+                            prompt: 'As people rely more and more on technology to solve problems, the ability of humans to think for themselves will surely deteriorate.',
+                            explanation: 'Write a response in which you discuss the extent to which you agree or disagree with the statement and explain your reasoning for the position you take. In developing and supporting your position, describe specific circumstances in which adopting the position would or would not obtain and explain how these examples shape your position.',
+                            points: 6,
+                            position: 1,
+                            created_at: new Date().toISOString(),
+                            updated_at: new Date().toISOString(),
+                            options: [],
+                          },
+                        ],
+                      },
+                    ],
+                  };
+
+                  const { dbService } = await import('../../services/db');
+                  await dbService.saveTestBundle(newWritingTest);
+                  alert(`New Standalone GRE Analytical Writing Test created! Access Code: ${accessCode}`);
+                  navigate(`/admin/tests/${newId}/edit`);
+                }}
+                className="px-3.5 py-2 rounded-md text-sm font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all flex items-center space-x-1.5 shadow-sm active:scale-95 border border-amber-400 cursor-pointer"
+                title="Create Standalone 30-Min GRE Analytical Writing Practice Test"
+              >
+                <Sparkles className="w-4 h-4 text-slate-950" />
+                <span>+ GRE Writing Test</span>
+              </button>
             </nav>
           </div>
 

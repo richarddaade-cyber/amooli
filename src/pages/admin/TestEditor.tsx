@@ -31,6 +31,7 @@ import {
   RefreshCw,
   Ban,
   ShieldAlert,
+  Sparkles,
 } from 'lucide-react';
 
 function generateUuid(): string {
@@ -340,6 +341,56 @@ export const TestEditor: React.FC = () => {
     setShowPassageModal(false);
   };
 
+  const handleApplyWritingTemplate = async () => {
+    if (!bundle) return;
+    if (window.confirm('Apply GRE Analytical Writing Preset Template? This will configure Section 1 for a 30-minute Issue Essay Task evaluated by Gemini AI.')) {
+      const qId = generateUuid();
+      const secId = bundle.sections[0]?.id || generateUuid();
+
+      const updatedBundle: TestFullDetails = {
+        test: {
+          ...bundle.test,
+          title: 'GRE Analytical Writing — Issue Essay Task',
+          description: 'Official 30-minute GRE Analytical Writing Issue Task. Express a well-reasoned argument and receive instant Gemini AI strict scoring (0.0–6.0).',
+          instructions: 'You will have 30 minutes to plan and compose a response to the given issue prompt. Copying and pasting external text is strictly disabled to simulate official ETS test day security.',
+          duration_minutes: 30,
+          updated_at: new Date().toISOString(),
+        },
+        sections: [
+          {
+            id: secId,
+            test_id: bundle.test.id,
+            title: 'Section 1: Analytical Writing (Analyze an Issue)',
+            description: 'Timed 30-minute Analytical Writing Essay Task.',
+            duration_minutes: 30,
+            position: 1,
+            created_at: new Date().toISOString(),
+            passages: [],
+            questions: [
+              {
+                id: qId,
+                section_id: secId,
+                question_type: 'ANALYTICAL_WRITING',
+                prompt: 'As people rely more and more on technology to solve problems, the ability of humans to think for themselves will surely deteriorate.',
+                explanation: 'Write a response in which you discuss the extent to which you agree or disagree with the statement and explain your reasoning for the position you take. In developing and supporting your position, describe specific circumstances in which adopting the position would or would not obtain and explain how these examples shape your position.',
+                points: 6,
+                position: 1,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                options: [],
+              },
+            ],
+          },
+        ],
+      };
+
+      setBundle(updatedBundle);
+      await dbService.saveTestBundle(updatedBundle);
+      setSaveToast('Applied GRE Analytical Writing Preset Template successfully!');
+      setTimeout(() => setSaveToast(null), 3000);
+    }
+  };
+
   const handlePublish = async () => {
     let totalQs = 0;
     bundle.sections.forEach((s) => (totalQs += (s.questions || []).length));
@@ -420,12 +471,39 @@ export const TestEditor: React.FC = () => {
 
             <button
               onClick={handlePublish}
-              className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md transition-all flex items-center space-x-1.5"
+              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-sm transition-colors flex items-center space-x-1.5"
             >
               <CheckCircle className="w-4 h-4" />
               <span>Publish</span>
             </button>
           </div>
+        </div>
+
+        {/* GRE Analytical Writing Preset Template Banner */}
+        <div className="bg-gradient-to-r from-amber-500/10 via-slate-900 to-slate-900 border border-amber-500/30 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-slate-100 shadow-sm">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-bold shadow-md flex-shrink-0">
+              <Sparkles className="w-5 h-5 text-slate-950" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-white flex items-center space-x-2">
+                <span>Create Standalone GRE Analytical Writing Test?</span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-400 text-slate-950 uppercase tracking-wider">
+                  Preset Template
+                </span>
+              </h3>
+              <p className="text-xs text-slate-300">
+                Load official 30-minute timed Issue Essay task preset with Gemini AI strict scoring (0.0–6.0).
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleApplyWritingTemplate}
+            className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition-all shadow-md active:scale-95 border border-amber-400 whitespace-nowrap cursor-pointer"
+          >
+            Apply GRE Writing Preset
+          </button>
         </div>
 
         {/* Test Settings Configuration Card */}
