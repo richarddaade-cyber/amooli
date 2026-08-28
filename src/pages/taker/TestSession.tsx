@@ -582,12 +582,20 @@ export const TestSession: React.FC = () => {
                         rows={16}
                         value={currentAnswer.text_answer || ''}
                         onChange={(e) => handleAnswerChange({ textAnswer: e.target.value })}
+                        onPaste={(e) => {
+                          e.preventDefault();
+                          alert('Pasting text into the essay editor is disabled to simulate official GRE test day conditions.');
+                        }}
+                        onCopy={(e) => e.preventDefault()}
+                        onCut={(e) => e.preventDefault()}
+                        onContextMenu={(e) => e.preventDefault()}
+                        onDrop={(e) => e.preventDefault()}
                         placeholder="Type your essay response here. Organize your thoughts into clear paragraphs (Introduction, Supporting Evidence, Counterarguments, and Conclusion)..."
                         className="w-full p-4 border border-slate-300 rounded-xl text-slate-900 text-sm font-sans leading-relaxed focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-y min-h-[360px] shadow-inner"
                         spellCheck={true}
                       />
                       <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
-                        <span>• Your essay is automatically saved in real time as you type.</span>
+                        <span>• Pasting external text is disabled to simulate official GRE test day security.</span>
                         <span>• Evaluated strictly by Gemini AI on the official ETS 0.0–6.0 scale upon submission.</span>
                       </div>
                     </div>
