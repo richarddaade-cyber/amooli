@@ -19,6 +19,7 @@ import {
   AlertCircle,
   BookOpen,
   Printer,
+  Sparkles,
 } from 'lucide-react';
 import { filterValidImages } from '../../components/admin/QuestionBuilder';
 
@@ -479,11 +480,105 @@ export const TestResults: React.FC = () => {
                           )}
                         </div>
 
-                        {/* ANSWER CHOICES / NUMERIC ANALYSIS */}
+                        {/* ANSWER CHOICES / NUMERIC ANALYSIS / ESSAY REPORT */}
                         <div className="space-y-2 pt-1">
-                          <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Answer Choice Breakdown</div>
+                          {q.question_type !== 'ANALYTICAL_WRITING' && (
+                            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Answer Choice Breakdown</div>
+                          )}
 
-                          {q.question_type === 'NUMERIC_ENTRY' ? (
+                          {q.question_type === 'ANALYTICAL_WRITING' ? (
+                            <div className="space-y-4">
+                              {/* Candidate Submitted Essay Text */}
+                              <div className="bg-slate-900 text-slate-100 rounded-xl p-4 space-y-2 border border-slate-800">
+                                <div className="flex items-center justify-between text-xs font-bold border-b border-slate-800 pb-2">
+                                  <span className="text-amber-400 uppercase tracking-wider flex items-center space-x-1.5">
+                                    <FileText className="w-4 h-4 text-amber-400" />
+                                    <span>Candidate Submitted Essay Response</span>
+                                  </span>
+                                  <span className="font-mono text-slate-400">
+                                    Word Count: {((ans?.text_answer || '').trim().split(/\s+/).filter(Boolean)).length}
+                                  </span>
+                                </div>
+                                <div className="text-xs font-mono text-slate-200 whitespace-pre-wrap leading-relaxed max-h-60 overflow-y-auto bg-slate-950/80 p-3 rounded-lg border border-slate-800/80">
+                                  {ans?.text_answer || '(No essay text submitted)'}
+                                </div>
+                              </div>
+
+                              {/* Gemini AI Strict GRE Score Report Card */}
+                              {ans?.essay_feedback ? (
+                                <div className="bg-white border-2 border-slate-300 rounded-2xl p-5 space-y-4 shadow-sm">
+                                  <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                                    <div className="flex items-center space-x-2">
+                                      <Sparkles className="w-5 h-5 text-amber-500" />
+                                      <span className="font-bold text-sm text-slate-900 uppercase tracking-wider">
+                                        Gemini AI GRE Analytical Writing Evaluation
+                                      </span>
+                                    </div>
+                                    <div className="px-3 py-1 rounded-xl bg-amber-500 text-slate-950 font-black text-base shadow-sm">
+                                      Score: {ans.essay_feedback.score.toFixed(1)} / 6.0
+                                    </div>
+                                  </div>
+
+                                  <div className="text-xs font-semibold text-slate-800 bg-amber-50 p-3.5 rounded-xl border border-amber-200">
+                                    <strong className="text-amber-900 uppercase tracking-wider block mb-1">Overall Assessment:</strong>
+                                    {ans.essay_feedback.summary}
+                                  </div>
+
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                                    {/* Strengths */}
+                                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 space-y-2">
+                                      <span className="font-bold text-emerald-900 uppercase tracking-wider flex items-center space-x-1.5">
+                                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                        <span>Key Strengths</span>
+                                      </span>
+                                      <ul className="space-y-1 text-emerald-950 list-disc list-inside pl-1">
+                                        {ans.essay_feedback.strengths.map((s, idx) => (
+                                          <li key={idx}>{s}</li>
+                                        ))}
+                                      </ul>
+                                    </div>
+
+                                    {/* Weaknesses */}
+                                    <div className="bg-rose-50 border border-rose-200 rounded-xl p-3.5 space-y-2">
+                                      <span className="font-bold text-rose-900 uppercase tracking-wider flex items-center space-x-1.5">
+                                        <XCircle className="w-4 h-4 text-rose-600" />
+                                        <span>Areas for Improvement</span>
+                                      </span>
+                                      <ul className="space-y-1 text-rose-950 list-disc list-inside pl-1">
+                                        {ans.essay_feedback.weaknesses.map((w, idx) => (
+                                          <li key={idx}>{w}</li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  </div>
+
+                                  {/* Detailed Feedback & Actionable Recommendations */}
+                                  <div className="space-y-2 text-xs pt-1">
+                                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-1">
+                                      <span className="font-bold text-slate-900 uppercase tracking-wider block">Detailed Analysis & Mechanics:</span>
+                                      <p className="text-slate-700 leading-relaxed font-sans">{ans.essay_feedback.detailed_feedback}</p>
+                                    </div>
+
+                                    {ans.essay_feedback.improvement_tips && ans.essay_feedback.improvement_tips.length > 0 && (
+                                      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-1.5">
+                                        <span className="font-bold text-blue-900 uppercase tracking-wider block">Actionable Tips to Reach Score 6.0:</span>
+                                        <ul className="space-y-1 text-blue-950 list-disc list-inside pl-1">
+                                          {ans.essay_feedback.improvement_tips.map((tip, idx) => (
+                                            <li key={idx}>{tip}</li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-900 flex items-center space-x-2">
+                                  <Sparkles className="w-4 h-4 text-amber-600" />
+                                  <span>Gemini AI essay evaluation summary pending or completed without feedback record.</span>
+                                </div>
+                              )}
+                            </div>
+                          ) : q.question_type === 'NUMERIC_ENTRY' ? (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs font-semibold">
                               <div>
                                 <span className="text-slate-500 block">Candidate Entry:</span>

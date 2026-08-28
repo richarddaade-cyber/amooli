@@ -8,9 +8,33 @@ export type QuestionType =
   | 'NUMERIC_ENTRY'
   | 'TEXT_COMPLETION'
   | 'SENTENCE_EQUIVALENCE'
-  | 'READING_COMPREHENSION';
+  | 'READING_COMPREHENSION'
+  | 'ANALYTICAL_WRITING';
 
 export type AttemptStatus = 'IN_PROGRESS' | 'SUBMITTED' | 'EXPIRED' | 'FORCE_SUBMITTED';
+
+export interface EssayFeedback {
+  score: number; // 0.0 to 6.0 scale in 0.5 increments
+  summary: string;
+  strengths: string[];
+  weaknesses: string[];
+  detailed_feedback: string;
+  improvement_tips: string[];
+  evaluated_at?: string;
+}
+
+export interface Answer {
+  id: string;
+  attempt_id: string;
+  question_id: string;
+  selected_option_ids: string[];
+  text_answer?: string;
+  is_marked_for_review: boolean;
+  is_correct?: boolean;
+  score_awarded?: number;
+  essay_feedback?: EssayFeedback;
+  updated_at: string;
+}
 
 export interface Test {
   id: string;
@@ -110,17 +134,7 @@ export interface Attempt {
   answers?: Record<string, Answer>; // Keyed by question_id
 }
 
-export interface Answer {
-  id: string;
-  attempt_id: string;
-  question_id: string;
-  selected_option_ids: string[];
-  text_answer?: string;
-  is_marked_for_review: boolean;
-  is_correct?: boolean;
-  score_awarded?: number;
-  updated_at: string;
-}
+
 
 export interface EventLog {
   id: string;

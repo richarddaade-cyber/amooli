@@ -261,7 +261,7 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
       position: question.position || 1,
       created_at: question.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      options: questionType === 'NUMERIC_ENTRY' ? [] : options.map((opt, idx) => ({
+      options: (questionType === 'NUMERIC_ENTRY' || questionType === 'ANALYTICAL_WRITING') ? [] : options.map((opt, idx) => ({
         id: opt.id || generateUuid(),
         question_id: qId,
         option_text: opt.option_text || '',
@@ -307,7 +307,7 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
       {/* 1. Question Type Selector */}
       <div className="space-y-2">
         <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Question Type</label>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-2">
           {[
             { id: 'MULTIPLE_CHOICE', label: 'Multiple Choice' },
             { id: 'QUANTITATIVE_COMPARISON', label: 'Quant Comparison' },
@@ -315,6 +315,7 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
             { id: 'SENTENCE_EQUIVALENCE', label: 'Sentence Equivalence' },
             { id: 'READING_COMPREHENSION', label: 'Reading Comp' },
             { id: 'TEXT_COMPLETION', label: 'Text Completion' },
+            { id: 'ANALYTICAL_WRITING', label: 'GRE Essay (Writing)' },
           ].map((type) => (
             <button
               key={type.id}

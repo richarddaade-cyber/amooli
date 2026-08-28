@@ -14,6 +14,8 @@ import {
   Menu,
   FileCheck,
   Calculator,
+  Sparkles,
+  FileText,
 } from 'lucide-react';
 import { filterValidImages } from '../../components/admin/QuestionBuilder';
 import { GreCalculator } from '../../components/taker/GreCalculator';
@@ -533,6 +535,62 @@ export const TestSession: React.FC = () => {
                       placeholder="Type or transfer numeric answer..."
                       className="w-full p-3.5 border border-slate-300 rounded-xl text-lg font-mono font-bold bg-white text-slate-900 focus:ring-2 focus:ring-blue-500 outline-none"
                     />
+                  </div>
+                )}
+
+                {/* GRE Analytical Writing (Essay Task) Workspace */}
+                {currentQ.question_type === 'ANALYTICAL_WRITING' && (
+                  <div className="space-y-4">
+                    <div className="bg-slate-900 text-slate-100 rounded-2xl p-6 space-y-3 shadow-md border border-slate-800">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 uppercase tracking-wider flex items-center space-x-1.5">
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>GRE Analytical Writing — Analyze an Issue Task</span>
+                        </span>
+                        <span className="text-xs font-mono font-bold text-slate-400">
+                          Time Allowed: 30 Mins
+                        </span>
+                      </div>
+                      <div className="text-base sm:text-lg font-serif italic text-slate-200 bg-slate-950/60 p-4 rounded-xl border border-slate-800/80 leading-relaxed">
+                        "{currentQ.prompt}"
+                      </div>
+                      {currentQ.explanation && (
+                        <div className="text-xs text-slate-300 bg-slate-800/50 p-3.5 rounded-xl border border-slate-700/50 space-y-1">
+                          <span className="font-bold text-amber-400 uppercase tracking-wider block">Specific Task Directions:</span>
+                          <p className="leading-relaxed text-slate-300">{currentQ.explanation}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="bg-white border border-slate-300 rounded-2xl p-5 shadow-sm space-y-3">
+                      <div className="flex items-center justify-between text-xs font-semibold text-slate-600 border-b border-slate-200 pb-2.5">
+                        <div className="flex items-center space-x-2">
+                          <FileText className="w-4 h-4 text-blue-600" />
+                          <span className="font-bold text-slate-800 uppercase tracking-wider">Essay Writing Canvas</span>
+                        </div>
+                        <div className="flex items-center space-x-4 font-mono">
+                          <span>
+                            Words: <strong className="text-blue-700 text-sm">{((currentAnswer.text_answer || '').trim().split(/\s+/).filter(Boolean)).length}</strong>
+                          </span>
+                          <span>
+                            Chars: <strong className="text-slate-700">{(currentAnswer.text_answer || '').length}</strong>
+                          </span>
+                        </div>
+                      </div>
+
+                      <textarea
+                        rows={16}
+                        value={currentAnswer.text_answer || ''}
+                        onChange={(e) => handleAnswerChange({ textAnswer: e.target.value })}
+                        placeholder="Type your essay response here. Organize your thoughts into clear paragraphs (Introduction, Supporting Evidence, Counterarguments, and Conclusion)..."
+                        className="w-full p-4 border border-slate-300 rounded-xl text-slate-900 text-sm font-sans leading-relaxed focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-y min-h-[360px] shadow-inner"
+                        spellCheck={true}
+                      />
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+                        <span>• Your essay is automatically saved in real time as you type.</span>
+                        <span>• Evaluated strictly by Gemini AI on the official ETS 0.0–6.0 scale upon submission.</span>
+                      </div>
+                    </div>
                   </div>
                 )}
 

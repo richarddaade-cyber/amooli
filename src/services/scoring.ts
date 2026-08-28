@@ -115,6 +115,24 @@ export function evaluateQuestionAnswer(
       return { isCorrect, scoreAwarded: isCorrect ? points : 0, maxPoints: points };
     }
 
+    case 'ANALYTICAL_WRITING': {
+      const maxPts = question.points || 6.0;
+      if (answer.essay_feedback) {
+        const essayScore = answer.essay_feedback.score;
+        return {
+          isCorrect: essayScore >= 3.5,
+          scoreAwarded: essayScore,
+          maxPoints: maxPts,
+        };
+      }
+      // If candidate wrote text, score proportionally or fallback
+      const wordCount = (text_answer || '').trim().split(/\s+/).filter(Boolean).length;
+      if (wordCount >= 20) {
+        return { isCorrect: true, scoreAwarded: 3.5, maxPoints: maxPts };
+      }
+      return { isCorrect: false, scoreAwarded: 0, maxPoints: maxPts };
+    }
+
     default:
       return { isCorrect: false, scoreAwarded: 0, maxPoints: points };
   }

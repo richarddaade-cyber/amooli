@@ -13,6 +13,7 @@ import {
 } from '../types/database';
 import { generateAccessCode } from './timer';
 import { calculateAttemptScore, evaluateQuestionAnswer } from './scoring';
+import { scoreGreEssay } from './geminiService';
 
 function generateUuid(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -534,6 +535,38 @@ export const supabaseDb = {
   ): Promise<Attempt> {
     const client = getSupabaseClient();
     const allQuestions: Question[] = testBundle.sections.flatMap((s) => s.questions || []);
+
+    // 1. Evaluate any Analytical Writing essay questions via Gemini AI
+    for (const q of allQuestions) {
+      if (q.question_type === 'ANALYTICAL_WRITING') {
+        const ans = answersMap[q.id];
+        const essayText = ans?.text_answer || '';
+        try {
+          const essayEval = await scoreGreEssay(q.prompt, essayText);
+          if (ans) {
+            ans.essay_feedback = essayEval;
+            ans.score_awarded = essayEval.score;
+            ans.is_correct = essayEval.score >= 3.5;
+          } else {
+            answersMap[q.id] = {
+              id: generateUuid(),
+              attempt_id: attemptId,
+              question_id: q.id,
+              selected_option_ids: [],
+              text_answer: essayText,
+              is_marked_for_review: false,
+              is_correct: essayEval.score >= 3.5,
+              score_awarded: essayEval.score,
+              essay_feedback: essayEval,
+              updated_at: new Date().toISOString(),
+            };
+          }
+        } catch (e) {
+          console.warn('Gemini essay score error:', e);
+        }
+      }
+    }
+
     const scored = calculateAttemptScore(allQuestions, answersMap);
     const now = new Date().toISOString();
 
@@ -561,22 +594,27 @@ export const supabaseDb = {
 
     await client.from('attempts').upsert(updatedAttempt);
 
-    // Save individual evaluated answers with is_correct and score_awarded to Supabase
+    // Save individual evaluated answers with is_correct, score_awarded, and essay_feedback to Supabase
     for (const q of allQuestions) {
       const ans = answersMap[q.id];
       if (ans) {
         const evalRes = evaluateQuestionAnswer(q, ans);
-        const ansRow = {
+        const ansRow: any = {
           id: ans.id && ans.id !== '' ? ans.id : generateUuid(),
           attempt_id: attemptId,
           question_id: q.id,
           selected_option_ids: ans.selected_option_ids || [],
           text_answer: ans.text_answer || '',
           is_marked_for_review: ans.is_marked_for_review || false,
-          is_correct: evalRes.isCorrect,
-          score_awarded: evalRes.scoreAwarded,
+          is_correct: ans.essay_feedback ? ans.essay_feedback.score >= 3.5 : evalRes.isCorrect,
+          score_awarded: ans.essay_feedback ? ans.essay_feedback.score : evalRes.scoreAwarded,
           updated_at: now,
         };
+
+        if (ans.essay_feedback) {
+          ansRow.essay_feedback = ans.essay_feedback;
+        }
+
         await client.from('answers').upsert(ansRow, { onConflict: 'attempt_id,question_id' });
       }
     }

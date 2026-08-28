@@ -148,6 +148,51 @@ Contrary to early hypotheses suggesting ocean stagnation, deep-water current vel
       },
     ],
   },
+  {
+    test: {
+      id: 'test-gre-writing-1',
+      title: 'GRE Analytical Writing — Issue Essay Task',
+      description: 'Official GRE 30-minute Analytical Writing Issue Task. Express a well-reasoned position on a complex issue, support it with relevant examples, and receive instant Gemini AI strict scoring (0.0–6.0).',
+      instructions: 'You will have 30 minutes to plan and compose a response to the given issue prompt. Respond according to the specific directions provided. Your essay will be strictly evaluated by Gemini AI on the official ETS 0.0–6.0 scale.',
+      duration_minutes: 30,
+      status: 'ACTIVE',
+      access_code: 'WRITING1',
+      max_attempts: 5,
+      result_visibility: 'AFTER_SUBMISSION',
+      randomize_questions: false,
+      randomize_options: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      sections_count: 1,
+      questions_count: 1,
+    },
+    sections: [
+      {
+        id: 'sec-writing-1',
+        test_id: 'test-gre-writing-1',
+        title: 'Section 1: Analytical Writing (Analyze an Issue)',
+        description: 'Timed 30-minute Analytical Writing Issue Essay Task.',
+        duration_minutes: 30,
+        position: 1,
+        created_at: new Date().toISOString(),
+        passages: [],
+        questions: [
+          {
+            id: 'q-writing-1',
+            section_id: 'sec-writing-1',
+            question_type: 'ANALYTICAL_WRITING',
+            prompt: 'As people rely more and more on technology to solve problems, the ability of humans to think for themselves will surely deteriorate.',
+            explanation: 'Write a response in which you discuss the extent to which you agree or disagree with the statement and explain your reasoning for the position you take. In developing and supporting your position, describe specific circumstances in which adopting the position would or would not obtain and explain how these examples shape your position.',
+            points: 6,
+            position: 1,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            options: [],
+          },
+        ],
+      },
+    ],
+  },
 ];
 
 // --- Local Storage Management Helpers ---
