@@ -23,7 +23,7 @@ export function setGeminiApiKey(key: string): void {
 }
 
 /**
- * Strict GRE Analytical Writing Essay Evaluator using Gemini API (gemini-3.7-flash)
+ * Strict GRE Analytical Writing Essay Evaluator — Solely Evaluated & Scored by Gemini AI
  */
 export async function scoreGreEssay(
   promptTitle: string,
@@ -32,7 +32,6 @@ export async function scoreGreEssay(
 ): Promise<EssayFeedback> {
   const apiKey = customApiKey || getGeminiApiKey();
   const wordCount = essayText.trim().split(/\s+/).filter(Boolean).length;
-  const paragraphCount = essayText.split(/\n\s*\n/).filter((p) => p.trim().length > 0).length;
 
   if (!essayText || wordCount < 20) {
     return {
@@ -53,11 +52,14 @@ export async function scoreGreEssay(
     };
   }
 
-  if (apiKey) {
-    try {
-      const ai = new GoogleGenAI({ apiKey });
-      const systemInstruction = `
-You are a senior ETS GRE Analytical Writing Evaluator.
+  if (!apiKey) {
+    throw new Error('Gemini API Key is missing. Gemini AI is configured as the sole evaluator. Please set your Gemini API Key in the settings or VITE_GEMINI_API_KEY environment variable.');
+  }
+
+  try {
+    const ai = new GoogleGenAI({ apiKey });
+    const systemInstruction = `
+You are a senior ETS GRE Analytical Writing Evaluator. You are the SOLE evaluator and scorer for this GRE essay.
 Your job is to strictly score a GRE "Analyze an Issue" essay on the official 0.0 to 6.0 scale in 0.5 increments (0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0).
 
 Be VERY STRICT to replicate actual GRE test day conditions.
@@ -81,7 +83,7 @@ CRITICAL INSTRUCTIONS:
 }
 `;
 
-      const contents = `
+    const contents = `
 GRE ISSUE PROMPT:
 ${promptTitle}
 
@@ -89,93 +91,35 @@ CANDIDATE ESSAY RESPONSE (Word Count: ${wordCount}):
 ${essayText}
 `;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.7-flash',
-        contents,
-        config: {
-          systemInstruction,
-          temperature: 0.2,
-        },
-      });
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents,
+      config: {
+        systemInstruction,
+        temperature: 0.2,
+      },
+    });
 
-      const responseText = response.text || '';
-      const cleanJsonStr = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
-      const parsed = JSON.parse(cleanJsonStr);
+    const responseText = response.text || '';
+    const cleanJsonStr = responseText.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const parsed = JSON.parse(cleanJsonStr);
 
-      let rawScore = Number(parsed.score);
-      if (isNaN(rawScore)) rawScore = 3.5;
-      // Clamp to 0.0 - 6.0 in 0.5 steps
-      const roundedScore = Math.min(6.0, Math.max(0.0, Math.round(rawScore * 2) / 2));
+    let rawScore = Number(parsed.score);
+    if (isNaN(rawScore)) rawScore = 3.5;
+    // Clamp to 0.0 - 6.0 in 0.5 steps
+    const roundedScore = Math.min(6.0, Math.max(0.0, Math.round(rawScore * 2) / 2));
 
-      return {
-        score: roundedScore,
-        summary: parsed.summary || 'GRE Analytical Writing Evaluation Complete.',
-        strengths: Array.isArray(parsed.strengths) ? parsed.strengths : ['Developed response submitted.'],
-        weaknesses: Array.isArray(parsed.weaknesses) ? parsed.weaknesses : ['Areas for development identified.'],
-        detailed_feedback: parsed.detailed_feedback || 'Detailed feedback evaluated by Gemini AI.',
-        improvement_tips: Array.isArray(parsed.improvement_tips) ? parsed.improvement_tips : ['Practice timed essay writing.'],
-        evaluated_at: new Date().toISOString(),
-      };
-    } catch (err) {
-      console.warn('Gemini API essay evaluation fallback triggered:', err);
-    }
+    return {
+      score: roundedScore,
+      summary: parsed.summary || 'GRE Analytical Writing Evaluation Complete (Gemini AI).',
+      strengths: Array.isArray(parsed.strengths) ? parsed.strengths : ['Developed response submitted.'],
+      weaknesses: Array.isArray(parsed.weaknesses) ? parsed.weaknesses : ['Areas for development identified.'],
+      detailed_feedback: parsed.detailed_feedback || 'Detailed feedback evaluated by Gemini AI.',
+      improvement_tips: Array.isArray(parsed.improvement_tips) ? parsed.improvement_tips : ['Practice timed essay writing.'],
+      evaluated_at: new Date().toISOString(),
+    };
+  } catch (err: any) {
+    console.error('Gemini API Essay Scoring Error:', err);
+    throw new Error(`Gemini AI Evaluation Failed: ${err.message || err}`);
   }
-
-  // --- Rule-Based Offline / Fallback Heuristic Evaluator ---
-  let heuristicScore = 3.0;
-  const strengths: string[] = [];
-  const weaknesses: string[] = [];
-  const tips: string[] = [];
-
-  if (wordCount >= 450) {
-    heuristicScore += 1.5;
-    strengths.push(`Substantial essay length (${wordCount} words) allowing detailed argument development.`);
-  } else if (wordCount >= 300) {
-    heuristicScore += 1.0;
-    strengths.push(`Good overall length (${wordCount} words).`);
-  } else if (wordCount >= 180) {
-    heuristicScore += 0.5;
-    weaknesses.push(`Essay length (${wordCount} words) is below the recommended 400+ words for top-tier scores.`);
-    tips.push('Expand your body paragraphs with concrete real-world or historical examples.');
-  } else {
-    heuristicScore -= 0.5;
-    weaknesses.push(`Brief essay response (${wordCount} words) limits reasoning depth.`);
-    tips.push('Aim for at least 350-500 words under timed conditions.');
-  }
-
-  if (paragraphCount >= 4) {
-    heuristicScore += 0.5;
-    strengths.push(`Clear multi-paragraph structural organization (${paragraphCount} paragraphs).`);
-  } else {
-    weaknesses.push(`Only ${paragraphCount} paragraph(s) detected. GRE essays require a distinct intro, body, and conclusion.`);
-    tips.push('Use explicit paragraph breaks between introduction, supporting arguments, and conclusion.');
-  }
-
-  // Check complex transition words
-  const transitionWords = ['however', 'therefore', 'consequently', 'furthermore', 'moreover', 'nevertheless', 'in contrast', 'for instance'];
-  const foundTransitions = transitionWords.filter((w) => essayText.toLowerCase().includes(w));
-  if (foundTransitions.length >= 3) {
-    heuristicScore += 0.5;
-    strengths.push(`Good use of logical transition signals (${foundTransitions.slice(0, 3).join(', ')}).`);
-  } else {
-    tips.push('Incorporate sophisticated transition words (e.g. "consequently", "furthermore", "in contrast") to link ideas.');
-  }
-
-  const finalScore = Math.min(6.0, Math.max(1.0, Math.round(heuristicScore * 2) / 2));
-
-  return {
-    score: finalScore,
-    summary: `Essay Evaluated (${wordCount} words, Score ${finalScore}/6.0).`,
-    strengths: strengths.length > 0 ? strengths : ['Submitted complete essay draft.'],
-    weaknesses: weaknesses.length > 0 ? weaknesses : ['Could benefit from more elaborated examples.'],
-    detailed_feedback: `Your essay response of ${wordCount} words across ${paragraphCount} paragraphs has been evaluated using GRE Analytical Writing standards. ${
-      finalScore >= 5.0
-        ? 'Demonstrates strong critical analysis, logical organization, and effective control of language.'
-        : finalScore >= 4.0
-        ? 'Presents a competent, well-supported position with sound organization.'
-        : 'Presents a basic position; needs deeper critical analysis and richer vocabulary.'
-    }`,
-    improvement_tips: tips.length > 0 ? tips : ['Practice outlining thesis statements and counterarguments before writing.'],
-    evaluated_at: new Date().toISOString(),
-  };
 }

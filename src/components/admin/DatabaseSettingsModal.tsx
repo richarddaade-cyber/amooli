@@ -8,12 +8,13 @@ interface DatabaseSettingsModalProps {
 export const DatabaseSettingsModal: React.FC<DatabaseSettingsModalProps> = ({ onClose }) => {
   const [url, setUrl] = useState(() => localStorage.getItem('preppulse_supabase_url') || '');
   const [anonKey, setAnonKey] = useState(() => localStorage.getItem('preppulse_supabase_key') || '');
+  const [geminiKey, setGeminiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
   const [saved, setSaved] = useState(false);
-  const [copiedSql, setCopiedSql] = useState(false);
 
   const handleSave = () => {
     if (url.trim()) localStorage.setItem('preppulse_supabase_url', url.trim());
     if (anonKey.trim()) localStorage.setItem('preppulse_supabase_key', anonKey.trim());
+    if (geminiKey.trim()) localStorage.setItem('gemini_api_key', geminiKey.trim());
     setSaved(true);
     setTimeout(() => {
       setSaved(false);
@@ -77,6 +78,22 @@ export const DatabaseSettingsModal: React.FC<DatabaseSettingsModalProps> = ({ on
               onChange={(e) => setAnonKey(e.target.value)}
               className="w-full p-3 border border-slate-300 rounded-xl text-sm font-mono bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-blue-500"
             />
+          </div>
+
+          <div className="space-y-1.5 pt-2 border-t border-slate-100">
+            <label className="text-xs font-bold uppercase tracking-wider text-amber-700 flex items-center justify-between">
+              <span>Gemini AI Evaluator API Key (Sole Essay Evaluator)</span>
+            </label>
+            <input
+              type="password"
+              placeholder="AIzaSy..."
+              value={geminiKey}
+              onChange={(e) => setGeminiKey(e.target.value)}
+              className="w-full p-3 border border-amber-300 rounded-xl text-sm font-mono bg-amber-50/30 focus:bg-white outline-none focus:ring-2 focus:ring-amber-500"
+            />
+            <p className="text-[11px] text-slate-500">
+              Gemini AI is configured as the sole evaluator and scorer for GRE Analytical Writing essays.
+            </p>
           </div>
         </div>
 
