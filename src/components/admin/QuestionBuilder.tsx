@@ -282,62 +282,128 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
 
   return (
     <div className="bg-white border border-slate-300 rounded-2xl p-6 shadow-xl space-y-6">
-      <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
-            <HelpCircle className="w-5 h-5" />
+      {questionType === 'ANALYTICAL_WRITING' ? (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold">
+                <Sparkles className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">
+                  {question.id ? 'Edit GRE Writing Prompt' : 'Create GRE Analytical Writing Task'}
+                </h3>
+                <p className="text-xs text-slate-500">Configure essay issue prompt statement and optional specific directions (Evaluated by Gemini AI)</p>
+              </div>
+            </div>
+            <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-amber-500 text-slate-950 shadow-sm border border-amber-400">
+              Score Scale: 0.0 – 6.0
+            </span>
           </div>
-          <div>
-            <h3 className="text-lg font-bold text-slate-900">
-              {question.id ? 'Edit Question' : 'Create New Question'}
-            </h3>
-            <p className="text-xs text-slate-500">Configure prompt, options, correct answers, and explanations</p>
-          </div>
-        </div>
 
-        <div className="flex items-center space-x-3">
-          <label className="text-xs font-semibold text-slate-600 flex items-center space-x-1.5">
-            <span>Points:</span>
-            <input
-              type="number"
-              min="0.5"
-              step="0.5"
-              value={points}
-              onChange={(e) => setPoints(parseFloat(e.target.value) || 1)}
-              className="w-16 px-2 py-1 border border-slate-300 rounded-lg text-center font-bold text-sm bg-slate-50"
+          {/* Field 1: Essay Issue Prompt Statement */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
+              Essay Issue Prompt Statement
+            </label>
+            <textarea
+              rows={4}
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="Enter the GRE Essay Issue Prompt statement here (e.g., As people rely more and more on technology to solve problems, the ability of humans to think for themselves will surely deteriorate.)"
+              className="w-full p-4 border border-slate-300 rounded-xl text-sm font-sans focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none shadow-sm leading-relaxed"
             />
-          </label>
-        </div>
-      </div>
+          </div>
 
-      {/* 1. Question Type Selector */}
-      <div className="space-y-2">
-        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Question Type</label>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-2">
-          {[
-            { id: 'MULTIPLE_CHOICE', label: 'Multiple Choice' },
-            { id: 'QUANTITATIVE_COMPARISON', label: 'Quant Comparison' },
-            { id: 'NUMERIC_ENTRY', label: 'Numeric Entry' },
-            { id: 'SENTENCE_EQUIVALENCE', label: 'Sentence Equivalence' },
-            { id: 'READING_COMPREHENSION', label: 'Reading Comp' },
-            { id: 'TEXT_COMPLETION', label: 'Text Completion' },
-            { id: 'ANALYTICAL_WRITING', label: 'GRE Essay (Writing)' },
-          ].map((type) => (
+          {/* Field 2: Specific Task Directions (Optional) */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
+              Specific Task Directions (Optional)
+            </label>
+            <textarea
+              rows={3}
+              value={explanation}
+              onChange={(e) => setExplanation(e.target.value)}
+              placeholder="e.g. Write a response in which you discuss the extent to which you agree or disagree with the statement and explain your reasoning for the position you take. In developing and supporting your position, describe specific circumstances in which adopting the position would or would not obtain and explain how these examples shape your position."
+              className="w-full p-3.5 border border-slate-300 rounded-xl text-sm font-sans focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none bg-slate-50 focus:bg-white leading-relaxed"
+            />
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center justify-end space-x-3 pt-4 border-t border-slate-200">
             <button
-              key={type.id}
               type="button"
-              onClick={() => handleTypeChange(type.id as QuestionType)}
-              className={`px-3 py-2.5 rounded-xl border text-xs font-semibold transition-all ${
-                questionType === type.id
-                  ? 'bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-300'
-                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-              }`}
+              onClick={onCancel}
+              className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-semibold hover:bg-slate-100 transition-colors"
             >
-              {type.label}
+              Cancel
             </button>
-          ))}
+            <button
+              type="button"
+              onClick={handleSave}
+              className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shadow-md transition-all active:scale-95 border border-amber-400"
+            >
+              Save Writing Task
+            </button>
+          </div>
         </div>
-      </div>
+      ) : (
+        <>
+          <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+                <HelpCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">
+                  {question.id ? 'Edit Question' : 'Create New Question'}
+                </h3>
+                <p className="text-xs text-slate-500">Configure prompt, options, correct answers, and explanations</p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-3">
+              <label className="text-xs font-semibold text-slate-600 flex items-center space-x-1.5">
+                <span>Points:</span>
+                <input
+                  type="number"
+                  min="0.5"
+                  step="0.5"
+                  value={points}
+                  onChange={(e) => setPoints(parseFloat(e.target.value) || 1)}
+                  className="w-16 px-2 py-1 border border-slate-300 rounded-lg text-center font-bold text-sm bg-slate-50"
+                />
+              </label>
+            </div>
+          </div>
+
+          {/* 1. Question Type Selector (Excluded for Analytical Writing) */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">Question Type</label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+              {[
+                { id: 'MULTIPLE_CHOICE', label: 'Multiple Choice' },
+                { id: 'QUANTITATIVE_COMPARISON', label: 'Quant Comparison' },
+                { id: 'NUMERIC_ENTRY', label: 'Numeric Entry' },
+                { id: 'SENTENCE_EQUIVALENCE', label: 'Sentence Equivalence' },
+                { id: 'READING_COMPREHENSION', label: 'Reading Comp' },
+                { id: 'TEXT_COMPLETION', label: 'Text Completion' },
+              ].map((type) => (
+                <button
+                  key={type.id}
+                  type="button"
+                  onClick={() => handleTypeChange(type.id as QuestionType)}
+                  className={`px-3 py-2.5 rounded-xl border text-xs font-semibold transition-all ${
+                    questionType === type.id
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-md ring-2 ring-blue-300'
+                      : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  {type.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
       {/* Reading Comprehension Passage Selector */}
       {questionType === 'READING_COMPREHENSION' && (
@@ -361,46 +427,30 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
         </div>
       )}
 
-      {/* Analytical Writing Notice Banner */}
-      {questionType === 'ANALYTICAL_WRITING' && (
-        <div className="bg-amber-50 border border-amber-300 rounded-xl p-3.5 text-xs text-amber-950 flex items-center space-x-2 shadow-sm">
-          <Sparkles className="w-4.5 h-4.5 text-amber-600 flex-shrink-0" />
-          <span>
-            <strong>GRE Analytical Writing Task:</strong> Only enter the Essay Prompt statement below. Options, answer choices, and numeric keys are omitted. Gemini AI evaluates candidate essays automatically on the official 0.0–6.0 scale upon submission.
-          </span>
-        </div>
-      )}
-
       {/* 2. Question Prompt */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-            {questionType === 'ANALYTICAL_WRITING' ? 'Essay Issue Prompt Statement' : 'Question Prompt / Text'}
+            Question Prompt / Text
           </label>
-          {questionType !== 'ANALYTICAL_WRITING' && (
-            <label className="cursor-pointer text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center space-x-1.5 border border-blue-200 bg-blue-50/50 px-3 py-1 rounded-lg">
-              <ImageIcon className="w-4 h-4" />
-              <span>+ Add Prompt Images</span>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={(e) => handleMultipleImagesUpload(e, setImageUrls)}
-              />
-            </label>
-          )}
+          <label className="cursor-pointer text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center space-x-1.5 border border-blue-200 bg-blue-50/50 px-3 py-1 rounded-lg">
+            <ImageIcon className="w-4 h-4" />
+            <span>+ Add Prompt Images</span>
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => handleMultipleImagesUpload(e, setImageUrls)}
+            />
+          </label>
         </div>
 
         <textarea
-          rows={questionType === 'ANALYTICAL_WRITING' ? 4 : 3}
+          rows={3}
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder={
-            questionType === 'ANALYTICAL_WRITING'
-              ? 'Enter the GRE Essay Issue Prompt statement here (e.g., As people rely more and more on technology to solve problems, the ability of humans to think for themselves will surely deteriorate.)'
-              : 'Enter or paste your question text here...'
-          }
+          placeholder="Enter or paste your question text here..."
           className="w-full p-3.5 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
         />
 
@@ -578,7 +628,7 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
       )}
 
       {/* 4. Options List (for MC / Quant Comparison / Sentence Eq) */}
-      {questionType !== 'NUMERIC_ENTRY' && questionType !== 'ANALYTICAL_WRITING' && (
+      {questionType !== 'NUMERIC_ENTRY' && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -651,53 +701,51 @@ export const QuestionBuilder: React.FC<QuestionBuilderProps> = ({
         </div>
       )}
 
-      {/* 5. Specific Directions / Explanation */}
+      {/* 5. Answer Explanation */}
       <div className="space-y-2 pt-2 border-t border-slate-200">
         <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-          {questionType === 'ANALYTICAL_WRITING' ? 'Specific Task Directions (Optional)' : 'Answer Explanation'}
+          Answer Explanation
         </label>
         <textarea
-          rows={questionType === 'ANALYTICAL_WRITING' ? 3 : 2}
+          rows={2}
           value={explanation}
           onChange={(e) => setExplanation(e.target.value)}
-          placeholder={
-            questionType === 'ANALYTICAL_WRITING'
-              ? 'e.g. Write a response in which you discuss the extent to which you agree or disagree with the statement and explain your reasoning for the position you take...'
-              : 'Provide step-by-step solution or explanation for candidate review...'
-          }
+          placeholder="Provide step-by-step solution or explanation for candidate review..."
           className="w-full p-3 border border-slate-300 rounded-xl text-sm bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex items-center justify-end space-x-3 pt-4 border-t border-slate-200">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-semibold hover:bg-slate-100 transition-colors"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          disabled={isProcessingImages}
-          onClick={handleSave}
-          className={`px-6 py-2.5 rounded-xl text-white text-xs font-bold shadow-md transition-all flex items-center space-x-2 ${
-            isProcessingImages
-              ? 'bg-slate-400 cursor-not-allowed'
-              : 'bg-blue-600 hover:bg-blue-500 hover:shadow-blue-500/20 active:scale-95'
-          }`}
-        >
-          {isProcessingImages ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Processing Images...</span>
-            </>
-          ) : (
-            <span>Save Question</span>
-          )}
-        </button>
-      </div>
+          {/* Action Buttons */}
+          <div className="flex items-center justify-end space-x-3 pt-4 border-t border-slate-200">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-xs font-semibold hover:bg-slate-100 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={isProcessingImages}
+              onClick={handleSave}
+              className={`px-6 py-2.5 rounded-xl text-white text-xs font-bold shadow-md transition-all flex items-center space-x-2 ${
+                isProcessingImages
+                  ? 'bg-slate-400 cursor-not-allowed'
+                  : 'bg-blue-600 hover:bg-blue-500 hover:shadow-blue-500/20 active:scale-95'
+              }`}
+            >
+              {isProcessingImages ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Processing Images...</span>
+                </>
+              ) : (
+                <span>Save Question</span>
+              )}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 };
